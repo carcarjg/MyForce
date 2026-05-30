@@ -2,468 +2,585 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:models="using:MyForce.Models"
         xmlns:viewModels="using:MyForce.ViewModels"
         x:Class="MyForce.MainWindow"
         x:DataType="viewModels:MainWindowViewModel"
         mc:Ignorable="d"
         d:DesignWidth="1366"
         d:DesignHeight="768"
-        MinWidth="1100"
-        MinHeight="720"
         Width="1366"
         Height="768"
+        MinWidth="1366"
+        MinHeight="768"
+        CanResize="False"
+        SystemDecorations="None"
+        WindowStartupLocation="CenterScreen"
+        Background="#2D090B"
         Title="MyForce">
     <Window.Resources>
-        <SolidColorBrush x:Key="ChassisBrush" Color="#050505" />
-        <SolidColorBrush x:Key="FrameBrush" Color="#4D0F14" />
-        <SolidColorBrush x:Key="FrameHighlightBrush" Color="#7C2027" />
-        <SolidColorBrush x:Key="PanelBorderBrush" Color="#5C5C5C" />
-        <SolidColorBrush x:Key="PanelInnerBorderBrush" Color="#222222" />
-        <SolidColorBrush x:Key="PrimaryTextBrush" Color="#F3F4F6" />
-        <SolidColorBrush x:Key="MutedTextBrush" Color="#B4B7BC" />
-        <SolidColorBrush x:Key="SignalTextBrush" Color="#A6DA5A" />
-        <SolidColorBrush x:Key="AlertTextBrush" Color="#FF5F57" />
-        <SolidColorBrush x:Key="ActiveBlueBrush" Color="#236CB8" />
-        <SolidColorBrush x:Key="ActiveBlueBorderBrush" Color="#6CA7E8" />
+        <SolidColorBrush x:Key="ShellBrush" Color="#2D090B" />
+        <SolidColorBrush x:Key="PanelBorderBrush" Color="#6A0D14" />
+        <SolidColorBrush x:Key="PrimaryTextBrush" Color="#F8F8F8" />
+        <SolidColorBrush x:Key="SignalBrush" Color="#9BD653" />
+        <SolidColorBrush x:Key="ButtonBorderBrush" Color="#808080" />
+        <SolidColorBrush x:Key="ActiveButtonBorderBrush" Color="#7DB4F0" />
+        <SolidColorBrush x:Key="ActiveButtonBrush" Color="#2B71BB" />
+        <SolidColorBrush x:Key="AlertBrush" Color="#96302A" />
 
-        <LinearGradientBrush x:Key="PanelBrush"
-                             StartPoint="0,0"
-                             EndPoint="0,1">
-            <GradientStop Color="#242424" Offset="0" />
-            <GradientStop Color="#141414" Offset="0.55" />
-            <GradientStop Color="#090909" Offset="1" />
+        <LinearGradientBrush x:Key="PanelBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#191919" Offset="0" />
+            <GradientStop Color="#101010" Offset="1" />
         </LinearGradientBrush>
 
-        <LinearGradientBrush x:Key="ButtonBrush"
-                             StartPoint="0,0"
-                             EndPoint="0,1">
-            <GradientStop Color="#666666" Offset="0" />
-            <GradientStop Color="#303030" Offset="0.28" />
-            <GradientStop Color="#161616" Offset="0.7" />
-            <GradientStop Color="#080808" Offset="1" />
+        <LinearGradientBrush x:Key="ButtonBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#3A3A3A" Offset="0" />
+            <GradientStop Color="#232323" Offset="0.45" />
+            <GradientStop Color="#111111" Offset="1" />
         </LinearGradientBrush>
-
-        <LinearGradientBrush x:Key="ButtonHighlightBrush"
-                             StartPoint="0,0"
-                             EndPoint="0,1">
-            <GradientStop Color="#5E92D0" Offset="0" />
-            <GradientStop Color="#2E6FB7" Offset="0.45" />
-            <GradientStop Color="#174982" Offset="1" />
-        </LinearGradientBrush>
-
-        <DataTemplate x:Key="ComponentTemplate" x:DataType="models:SystemComponent">
-            <Border Classes="framePanel"
-                    Margin="0,0,0,12"
-                    Padding="14">
-                <StackPanel Spacing="10">
-                    <Grid ColumnDefinitions="*,Auto"
-                          RowDefinitions="Auto,Auto,Auto">
-                        <TextBlock Grid.Row="0"
-                                   Grid.Column="0"
-                                   Classes="primaryText"
-                                   FontSize="22"
-                                   FontWeight="Bold"
-                                   Text="{Binding Name}" />
-                        <Border Grid.Row="0"
-                                Grid.Column="1"
-                                Classes="controlButton active"
-                                Padding="14,10"
-                                MinWidth="110">
-                            <TextBlock Classes="primaryText"
-                                       FontSize="12"
-                                       FontWeight="Bold"
-                                       TextAlignment="Center"
-                                       Text="{Binding Status}" />
-                        </Border>
-                        <TextBlock Grid.Row="1"
-                                   Grid.Column="0"
-                                   Grid.ColumnSpan="2"
-                                   Margin="0,10,0,0"
-                                   Classes="mutedText"
-                                   FontSize="12"
-                                   FontWeight="SemiBold"
-                                   Text="COMPONENT ROLE" />
-                        <TextBlock Grid.Row="2"
-                                   Grid.Column="0"
-                                   Grid.ColumnSpan="2"
-                                   Margin="0,2,0,0"
-                                   Classes="primaryText"
-                                   TextWrapping="Wrap"
-                                   Text="{Binding Role}" />
-                    </Grid>
-
-                    <Grid ColumnDefinitions="*,*"
-                          ColumnSpacing="12">
-                        <Border Grid.Column="0"
-                                Classes="controlButton"
-                                Padding="10,12">
-                            <StackPanel Spacing="4">
-                                <TextBlock Classes="panelLabel"
-                                           Text="PLANE" />
-                                <TextBlock Classes="panelValue"
-                                           FontSize="18"
-                                           Text="{Binding Plane}" />
-                            </StackPanel>
-                        </Border>
-                        <Border Grid.Column="1"
-                                Classes="controlButton"
-                                Padding="10,12">
-                            <StackPanel Spacing="4">
-                                <TextBlock Classes="panelLabel"
-                                           Text="TRANSPORT" />
-                                <TextBlock Classes="panelValue"
-                                           FontSize="18"
-                                           Text="{Binding Transport}" />
-                            </StackPanel>
-                        </Border>
-                    </Grid>
-                </StackPanel>
-            </Border>
-        </DataTemplate>
-
-        <DataTemplate x:Key="ConnectionTemplate" x:DataType="models:SystemConnection">
-            <Border Classes="framePanel"
-                    Margin="0,0,0,12"
-                    Padding="12">
-                <Grid ColumnDefinitions="1.7*,Auto,1.7*,1.4*,Auto">
-                    <TextBlock Grid.Column="0"
-                               Classes="primaryText"
-                               VerticalAlignment="Center"
-                               FontSize="18"
-                               FontWeight="Bold"
-                               Text="{Binding Source}" />
-                    <Border Grid.Column="1"
-                            Classes="controlButton active"
-                            Margin="12,0"
-                            Padding="12,8">
-                        <TextBlock Classes="primaryText"
-                                   FontWeight="Bold"
-                                   Text="LINK" />
-                    </Border>
-                    <TextBlock Grid.Column="2"
-                               Classes="primaryText"
-                               VerticalAlignment="Center"
-                               FontSize="18"
-                               FontWeight="Bold"
-                               Text="{Binding Target}" />
-                    <Border Grid.Column="3"
-                            Classes="controlButton"
-                            Margin="16,0,0,0"
-                            Padding="10,8">
-                        <StackPanel Spacing="2">
-                            <TextBlock Classes="panelLabel"
-                                       Text="TRANSPORT" />
-                            <TextBlock Classes="primaryText"
-                                       FontWeight="Bold"
-                                       TextAlignment="Center"
-                                       Text="{Binding Transport}" />
-                        </StackPanel>
-                    </Border>
-                    <Border Grid.Column="4"
-                            Classes="controlButton active"
-                            Margin="16,0,0,0"
-                            Padding="12,8"
-                            MinWidth="90">
-                        <TextBlock Classes="primaryText"
-                                   FontSize="12"
-                                   FontWeight="Bold"
-                                   TextAlignment="Center"
-                                   Text="{Binding Plane}" />
-                    </Border>
-                </Grid>
-            </Border>
-        </DataTemplate>
-
-        <DataTemplate x:Key="TopicTemplate" x:DataType="models:MqttTopicGroup">
-            <Border Classes="framePanel"
-                    Margin="0,0,0,12"
-                    Padding="14">
-                <Grid RowDefinitions="Auto,Auto,Auto"
-                      ColumnDefinitions="2*,2.4*,Auto,Auto">
-                    <TextBlock Grid.Row="0"
-                               Grid.Column="0"
-                               Classes="primaryText"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               Text="{Binding Name}" />
-                    <SelectableTextBlock Grid.Row="0"
-                                         Grid.Column="1"
-                                         Margin="16,0,0,0"
-                                         Foreground="{StaticResource SignalTextBrush}"
-                                         FontWeight="Bold"
-                                         Text="{Binding Topic}" />
-                    <Border Grid.Row="0"
-                            Grid.Column="2"
-                            Classes="controlButton"
-                            Margin="16,0,0,0"
-                            Padding="10,8">
-                        <TextBlock Classes="primaryText"
-                                   FontSize="12"
-                                   FontWeight="Bold"
-                                   TextAlignment="Center"
-                                   Text="{Binding RetainLabel}" />
-                    </Border>
-                    <Border Grid.Row="0"
-                            Grid.Column="3"
-                            Classes="controlButton active"
-                            Margin="8,0,0,0"
-                            Padding="10,8">
-                        <TextBlock Classes="primaryText"
-                                   FontSize="12"
-                                   FontWeight="Bold"
-                                   TextAlignment="Center"
-                                   Text="{Binding QosLabel}" />
-                    </Border>
-                    <TextBlock Grid.Row="1"
-                               Grid.Column="0"
-                               Grid.ColumnSpan="4"
-                               Margin="0,10,0,0"
-                               Classes="primaryText"
-                               TextWrapping="Wrap"
-                               Text="{Binding Purpose}" />
-                </Grid>
-            </Border>
-        </DataTemplate>
     </Window.Resources>
 
     <Window.Styles>
-        <Style Selector="TextBlock.titleText">
-            <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
-            <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="FontSize" Value="30" />
-        </Style>
-
-        <Style Selector="TextBlock.sectionTitle">
-            <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
-            <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="FontSize" Value="22" />
-            <Setter Property="TextAlignment" Value="Center" />
-        </Style>
-
-        <Style Selector="TextBlock.panelLabel">
-            <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="TextAlignment" Value="Center" />
-        </Style>
-
-        <Style Selector="TextBlock.panelValue">
-            <Setter Property="Foreground" Value="{StaticResource SignalTextBrush}" />
-            <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="FontSize" Value="24" />
-            <Setter Property="TextAlignment" Value="Center" />
-        </Style>
-
-        <Style Selector="TextBlock.primaryText">
-            <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
-        </Style>
-
-        <Style Selector="TextBlock.mutedText">
-            <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}" />
-        </Style>
-
-        <Style Selector="Border.framePanel">
+        <Style Selector="Border.panel">
             <Setter Property="Background" Value="{StaticResource PanelBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource FrameBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="CornerRadius" Value="2" />
+        </Style>
+
+        <Style Selector="Border.buttonFrame">
+            <Setter Property="Background" Value="{StaticResource ButtonBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource ButtonBorderBrush}" />
             <Setter Property="BorderThickness" Value="2" />
             <Setter Property="CornerRadius" Value="3" />
-            <Setter Property="BoxShadow" Value="0 0 0 1 #111111 inset" />
         </Style>
 
-        <Style Selector="Border.controlButton">
-            <Setter Property="Background" Value="{StaticResource ButtonBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="4" />
-            <Setter Property="BoxShadow" Value="0 1 0 0 #8A8A8A inset, 0 -1 0 0 #000000 inset" />
+        <Style Selector="Border.buttonFrame.active">
+            <Setter Property="Background" Value="{StaticResource ActiveButtonBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource ActiveButtonBorderBrush}" />
         </Style>
 
-        <Style Selector="Border.controlButton.active">
-            <Setter Property="Background" Value="{StaticResource ButtonHighlightBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource ActiveBlueBorderBrush}" />
+        <Style Selector="TextBlock.white">
+            <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
+            <Setter Property="FontFamily" Value="Segoe UI" />
+            <Setter Property="FontWeight" Value="Bold" />
         </Style>
     </Window.Styles>
 
-    <Grid RowDefinitions="Auto,*"
-          Background="{StaticResource ChassisBrush}">
-        <Border Padding="20,18,20,14"
-                Background="{StaticResource ChassisBrush}"
-                BorderBrush="{StaticResource FrameBrush}"
-                BorderThickness="0,0,0,2">
-            <Grid RowDefinitions="Auto,Auto"
-                  RowSpacing="14">
-                <WrapPanel HorizontalAlignment="Center"
-                           ItemHeight="74"
-                           ItemWidth="120"
-                           Orientation="Horizontal">
-                    <Border Classes="controlButton active" Margin="0,0,10,0" Padding="14,12">
-                        <StackPanel Spacing="6">
-                            <TextBlock Classes="panelLabel" Text="MODE" />
-                            <TextBlock Classes="primaryText" FontSize="18" FontWeight="Bold" Text="PATROL" />
-                        </StackPanel>
-                    </Border>
-                    <Border Classes="controlButton" Margin="0,0,10,0" Padding="14,12">
-                        <StackPanel Spacing="6">
-                            <TextBlock Classes="panelLabel" Text="UNIT" />
-                            <TextBlock Classes="primaryText" FontSize="18" FontWeight="Bold" Text="L / S" />
-                        </StackPanel>
-                    </Border>
-                    <Border Classes="controlButton" Margin="0,0,10,0" Padding="14,12">
-                        <StackPanel Spacing="6">
-                            <TextBlock Classes="panelLabel" Text="AUDIO" />
-                            <TextBlock Classes="primaryText" FontSize="18" FontWeight="Bold" Text="RADIO" />
-                        </StackPanel>
-                    </Border>
-                    <Border Classes="controlButton" Margin="0,0,10,0" Padding="14,12">
-                        <StackPanel Spacing="6">
-                            <TextBlock Classes="panelLabel" Text="SENSOR" />
-                            <TextBlock Classes="primaryText" FontSize="18" FontWeight="Bold" Text="SCADA" />
-                        </StackPanel>
-                    </Border>
-                    <Border Classes="controlButton" Margin="0,0,10,0" Padding="14,12">
-                        <StackPanel Spacing="6">
-                            <TextBlock Classes="panelLabel" Text="EXTERNAL" />
-                            <TextBlock Classes="primaryText" FontSize="18" FontWeight="Bold" Text="CAD" />
-                        </StackPanel>
-                    </Border>
-                    <Border Classes="controlButton" Padding="14,12">
-                        <StackPanel Spacing="6">
-                            <TextBlock Classes="panelLabel" Text="EVENTS" />
-                            <TextBlock Classes="primaryText" FontSize="18" FontWeight="Bold" Text="CAMERA" />
-                        </StackPanel>
-                    </Border>
-                </WrapPanel>
-
-                <Grid Grid.Row="1"
-                      ColumnDefinitions="*,Auto,Auto,Auto"
-                      ColumnSpacing="16">
-                    <Border Grid.Column="0"
-                            Classes="framePanel"
-                            Padding="18,16">
-                        <StackPanel Spacing="8">
-                            <TextBlock Classes="titleText"
-                                       Text="{Binding Title}" />
-                            <TextBlock MaxWidth="760"
-                                       Classes="primaryText"
-                                       TextWrapping="Wrap"
-                                       Text="{Binding Summary}" />
-                        </StackPanel>
-                    </Border>
-
-                    <Border Grid.Column="1"
-                            Classes="controlButton"
-                            Padding="18,14"
-                            MinWidth="130">
-                        <StackPanel Spacing="6">
-                            <TextBlock Classes="panelLabel"
-                                       Text="COMPONENTS" />
-                            <TextBlock Classes="panelValue"
-                                       Text="{Binding ComponentCount}" />
-                        </StackPanel>
-                    </Border>
-
-                    <Border Grid.Column="2"
-                            Classes="controlButton"
-                            Padding="18,14"
-                            MinWidth="130">
-                        <StackPanel Spacing="6">
-                            <TextBlock Classes="panelLabel"
-                                       Text="CORE" />
-                            <TextBlock Classes="panelValue"
-                                       Text="{Binding CoreComponentCount}" />
-                        </StackPanel>
-                    </Border>
-
-                    <Border Grid.Column="3"
-                            Classes="controlButton active"
-                            Padding="18,14"
-                            MinWidth="130">
-                        <StackPanel Spacing="6">
-                            <TextBlock Classes="panelLabel"
-                                       Text="MQTT GROUPS" />
-                            <TextBlock Classes="panelValue"
-                                       Foreground="{StaticResource PrimaryTextBrush}"
-                                       Text="{Binding TopicGroupCount}" />
-                        </StackPanel>
-                    </Border>
-                </Grid>
-            </Grid>
-        </Border>
-
-        <ScrollViewer Grid.Row="1"
-                      HorizontalScrollBarVisibility="Disabled"
-                      VerticalScrollBarVisibility="Auto">
-            <Grid Margin="20"
-                  ColumnDefinitions="1.2*,0.9*"
-                  RowDefinitions="Auto,Auto"
-                  ColumnSpacing="18"
-                  RowSpacing="18">
-                <Border Grid.Row="0"
-                        Grid.Column="0"
-                        Classes="framePanel"
-                        Padding="18">
-                    <StackPanel Spacing="20">
-                        <StackPanel Spacing="4">
-                            <TextBlock Classes="sectionTitle"
-                                       Text="Application Components" />
-                            <TextBlock Classes="mutedText"
+    <Grid Background="{StaticResource ShellBrush}">
+        <Grid Width="1280"
+              Height="760"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center"
+              Margin="0"
+              ColumnDefinitions="304,948"
+              ColumnSpacing="10">
+            <Grid Grid.Column="0"
+                  Width="304"
+                  Height="748"
+                  RowDefinitions="87,180,152,65,120,88"
+                  RowSpacing="10">
+                <Border Grid.Row="0" Classes="panel" Width="304" Height="87" Padding="8">
+                    <Grid ColumnDefinitions="89,176" ColumnSpacing="9" HorizontalAlignment="Center">
+                        <StackPanel Width="89" Height="63" Spacing="0" HorizontalAlignment="Center">
+                            <TextBlock Classes="white"
+                                       Width="89"
+                                       Height="24"
+                                       FontSize="18"
                                        TextAlignment="Center"
-                                       Text="Core and supporting modules defined by the current project framework." />
+                                       Text="{Binding SpeedLabel}" />
+                            <TextBlock Width="89"
+                                       Height="42"
+                                       Foreground="{StaticResource SignalBrush}"
+                                       FontFamily="Segoe UI"
+                                       FontWeight="Bold"
+                                       FontSize="30"
+                                       TextAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Text="{Binding SpeedValue}" />
+                            
                         </StackPanel>
 
-                        <ItemsControl ItemsSource="{Binding Components}"
-                                      ItemTemplate="{StaticResource ComponentTemplate}" />
-                    </StackPanel>
+                        <StackPanel Grid.Column="1" Width="176" Height="63" Spacing="0" HorizontalAlignment="Center">
+                            <TextBlock Classes="white"
+                                       Width="176"
+                                       Height="24"
+                                       FontSize="18"
+                                       TextAlignment="Center"
+                                       Text="{Binding LocationLabel}" />
+                            <TextBlock Width="176"
+                                       Height="42"
+                                       Foreground="{StaticResource SignalBrush}"
+                                       FontFamily="Segoe UI"
+                                       FontWeight="Bold"
+                                       FontSize="18"
+                                       TextAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Text="{Binding LocationValue}" />
+
+                        </StackPanel>
+                    </Grid>
                 </Border>
 
-                <Border Grid.Row="0"
-                        Grid.Column="1"
-                        Classes="framePanel"
-                        Padding="18">
-                    <StackPanel Spacing="20">
-                        <StackPanel Spacing="4">
-                            <TextBlock Classes="sectionTitle"
-                                       Text="Connection Matrix" />
-                            <TextBlock Classes="mutedText"
-                                       TextAlignment="Center"
-                                       Text="Representative transport links across the audio, control, and external planes." />
+                <Border Grid.Row="1" Classes="panel" Width="304" Height="180" Padding="12">
+                    <Grid RowDefinitions="35,29,87" RowSpacing="0">
+                        <TextBlock Classes="white"
+                                   Height="35"
+                                   FontSize="18"
+                                   VerticalAlignment="Center"
+                                   Text="{Binding TalkRadio}" />
+                        <TextBlock Grid.Row="1"
+                                   Classes="white"
+                                   Height="29"
+                                   FontSize="18"
+                                   VerticalAlignment="Center"
+                                   Text="{Binding RadioChannel}" />
+                        <Grid Grid.Row="2"
+                              Width="278"
+                              Height="87"
+                              ColumnDefinitions="86,86,88"
+                              ColumnSpacing="6"
+                              HorizontalAlignment="Left"
+                              VerticalAlignment="Bottom">
+                            <Border Grid.Column="0" Classes="buttonFrame" Width="86" Height="81">
+                                <Viewbox Stretch="Uniform">
+                                    <TextBlock Classes="white"
+                                               TextAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Text="CH UP" />
+                                </Viewbox>
+                            </Border>
+                            <Border Grid.Column="1" Classes="buttonFrame" Width="86" Height="81">
+                                <Viewbox Stretch="Uniform">
+                                    <TextBlock Classes="white"
+                                               TextAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Text="CH DN" />
+                                </Viewbox>
+                            </Border>
+                            <Border Grid.Column="2" Classes="buttonFrame" Width="88" Height="81">
+                                <Viewbox Stretch="Uniform">
+                                    <TextBlock Classes="white"
+                                               TextAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Text="SCAN" />
+                                </Viewbox>
+                            </Border>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="2" Classes="panel" Width="304" Height="154" Padding="12">
+                    <TextBlock Classes="white"
+                               Width="278"
+                               Height="126"
+                               FontSize="18"
+                               TextWrapping="Wrap"
+                               Text="{Binding AlertStatus}" />
+                </Border>
+
+                <Border Grid.Row="3" Classes="panel" Width="304" Height="65" Padding="12,10">
+                    <TextBlock Classes="white"
+                               Width="278"
+                               Height="43"
+                               FontSize="13"
+                               TextAlignment="Center"
+                               VerticalAlignment="Center"
+                               Text="{Binding CadMessage}" />
+                </Border>
+
+                <Border Grid.Row="4" Classes="panel" Width="304" Height="120" Padding="12">
+                    <Grid Width="278"
+                          Height="99"
+                          ColumnDefinitions="86,86,88"
+                          ColumnSpacing="6"
+                          VerticalAlignment="Bottom">
+                        <Border Grid.Column="0" Classes="buttonFrame" Width="86" Height="93">
+                            <Viewbox Stretch="Uniform">
+                                <TextBlock Classes="white"
+                                           TextAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Text="REC" />
+                            </Viewbox>
+                        </Border>
+                        <Border Grid.Column="1" Classes="buttonFrame" Width="86" Height="93">
+                            <Viewbox Stretch="Uniform">
+                                <TextBlock Classes="white"
+                                           TextAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Text="STOP" />
+                            </Viewbox>
+                        </Border>
+                        <Border Grid.Column="2" Classes="buttonFrame" Width="88" Height="93">
+                            <Viewbox Stretch="Uniform">
+                                <TextBlock Classes="white"
+                                           TextAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Text="AUTOZ" />
+                            </Viewbox>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="5" Classes="panel" Width="298" Height="88" Padding="8">
+                    <Grid Width="280"
+                          Height="70"
+                          ColumnDefinitions="128,65,69"
+                          ColumnSpacing="6">
+                        <StackPanel Width="128" Height="64" Spacing="0">
+                            <TextBlock Classes="white"
+                                       Width="128"
+                                       Height="34"
+                                       FontSize="28"
+                                       VerticalAlignment="Center"
+                                       Text="{Binding Clock}" />
+                            <TextBlock Classes="white"
+                                       Width="128"
+                                       Height="23"
+                                       FontSize="15"
+                                       Text="{Binding Date}" />
                         </StackPanel>
 
-                        <Border Classes="controlButton"
-                                Padding="16">
-                            <StackPanel Spacing="6">
-                                <TextBlock Classes="panelLabel"
-                                           Text="Connections" />
-                                <TextBlock Classes="panelValue"
-                                           Text="{Binding ConnectionCount}" />
-                            </StackPanel>
+                        <StackPanel Grid.Column="1" Width="65" Height="64" Spacing="0">
+                            <TextBlock Classes="white"
+                                       Width="65"
+                                       Height="26"
+                                       FontSize="20"
+                                       TextAlignment="Center"
+                                       Text="VOL" />
+                            <TextBlock Width="65"
+                                       Height="37"
+                                       Foreground="{StaticResource SignalBrush}"
+                                       FontFamily="Segoe UI"
+                                       FontWeight="Bold"
+                                       FontSize="28"
+                                       TextAlignment="Center"
+                                       Text="{Binding Volume}" />
+                        </StackPanel>
+
+                        <Border Grid.Column="2"
+                                Width="69"
+                                Height="64"
+                                Background="{StaticResource AlertBrush}"
+                                BorderBrush="{StaticResource ActiveButtonBorderBrush}"
+                                BorderThickness="2"
+                                CornerRadius="3">
+                            <Viewbox Stretch="Uniform">
+                                <TextBlock Classes="white"
+                                           TextAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Text="E-911" />
+                            </Viewbox>
+                        </Border>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <Border Grid.Column="1"
+                    Width="948"
+                    Height="742"
+                    Background="#000000"
+                    BorderBrush="{StaticResource PanelBorderBrush}"
+                    BorderThickness="2"
+                    CornerRadius="2"
+                    Padding="8">
+                <Grid Width="930"
+                      Height="724"
+                      RowDefinitions="66,637"
+                      RowSpacing="9">
+                    <Grid Width="924"
+                          Height="66"
+                          ColumnDefinitions="125,125,125,125,125,125,131"
+                          ColumnSpacing="6">
+                        <Border Grid.Column="0" Classes="buttonFrame active" Width="125" Height="58" VerticalAlignment="Top">
+                            <Viewbox Stretch="Uniform">
+                                <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="PATROL" />
+                            </Viewbox>
+                        </Border>
+                        <Border Grid.Column="1" Classes="buttonFrame" Width="125" Height="58" VerticalAlignment="Top">
+                            <Viewbox Stretch="Uniform">
+                                <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="L / S" />
+                            </Viewbox>
+                        </Border>
+                        <Border Grid.Column="2" Classes="buttonFrame" Width="125" Height="58" VerticalAlignment="Top">
+                            <Viewbox Stretch="Uniform">
+                                <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="RADIO" />
+                            </Viewbox>
+                        </Border>
+                        <Border Grid.Column="3" Classes="buttonFrame" Width="125" Height="58" VerticalAlignment="Top">
+                            <Viewbox Stretch="Uniform">
+                                <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="RADAR" />
+                            </Viewbox>
+                        </Border>
+                        <Border Grid.Column="4" Classes="buttonFrame" Width="125" Height="58" VerticalAlignment="Top">
+                            <Viewbox Stretch="Uniform">
+                                <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="AM/FM" />
+                            </Viewbox>
+                        </Border>
+                        <Border Grid.Column="5" Classes="buttonFrame" Width="125" VerticalAlignment="Top">
+                            <Viewbox Width="125" Height="53" Stretch="Uniform">
+                                <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="CAD" />
+                            </Viewbox>
+                        </Border>
+                        <Border Grid.Column="6" Classes="buttonFrame" Width="131" Height="58" VerticalAlignment="Top">
+                            <Viewbox Stretch="Uniform">
+                                <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="CAMERA" />
+                            </Viewbox>
+                        </Border>
+                    </Grid>
+
+                    <Grid Grid.Row="1"
+                          Width="916"
+                          Height="637"
+                          ColumnDefinitions="322,578"
+                          ColumnSpacing="10">
+                        <Border Grid.Column="0" Classes="panel" Width="322" Height="637" Padding="8">
+                            <Grid Width="304"
+                                  Height="619"
+                                  RowDefinitions="223,238,132"
+                                  RowSpacing="10">
+                                <Border Grid.Row="0" Classes="panel" Width="304" Height="223" Padding="10">
+                                    <StackPanel Width="282" Height="204" Spacing="0">
+                                        <TextBlock Classes="white" Width="282" Height="34" FontSize="18" Text="RADIO 1: CT OPS 800" />
+                                        <TextBlock Classes="white" Width="282" Height="34" FontSize="18" Text="RADIO 2: CT OPS V" />
+                                        <TextBlock Classes="white" Width="282" Height="34" FontSize="18" Text="RADIO 3: TXT MAIN" />
+                                        <TextBlock Classes="white" Width="282" Height="34" FontSize="18" Text="RADIO 4: CT ALE M" />
+                                        <TextBlock Classes="white" Width="282" Height="34" FontSize="18" Text="RADIO 5: $CMD_1" />
+                                        <TextBlock Classes="white" Width="282" Height="34" FontSize="18" Text="RADIO 6: ABIA TWR" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Grid.Row="1" Classes="panel" Width="304" Height="238" Padding="10">
+                                    <Grid Width="282" Height="216" RowDefinitions="32,184" RowSpacing="0">
+                                        <TextBlock Classes="white"
+                                                   Width="282"
+                                                   Height="32"
+                                                   FontSize="18"
+                                                   TextAlignment="Center"
+                                                   Text="PROXIMITY LIST" />
+                                        <Grid Grid.Row="1"
+                                              Width="282"
+                                              Height="184"
+                                              ColumnDefinitions="135,135"
+                                              RowDefinitions="86,86"
+                                              ColumnSpacing="6"
+                                              RowSpacing="6">
+                                            <Border Grid.Row="0" Grid.Column="0" Classes="buttonFrame" Width="135" Height="86">
+                                                <Viewbox Stretch="Uniform">
+                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" FontSize="1" Text="CT OPS 800" />
+                                                </Viewbox>
+                                            </Border>
+                                            <Border Grid.Row="0" Grid.Column="1" Classes="buttonFrame" Width="135" Height="86">
+                                                <Viewbox Stretch="Uniform">
+                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" FontSize="1" Text="DFW TAC1" />
+                                                </Viewbox>
+                                            </Border>
+                                            <Border Grid.Row="1" Grid.Column="0" Classes="buttonFrame" Width="135" Height="86">
+                                                <Viewbox Stretch="Uniform">
+                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" FontSize="1" Text="$CMD_1" />
+                                                </Viewbox>
+                                            </Border>
+                                            <Border Grid.Row="1" Grid.Column="1" Classes="buttonFrame" Width="135" Height="86">
+                                                <Viewbox Stretch="Uniform">
+                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" FontSize="1" Text="DFW_TWR_E" />
+                                                </Viewbox>
+                                            </Border>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+
+                                <Border Grid.Row="2" Classes="panel" Width="298" Height="132" Padding="10">
+                                    <Grid Width="276" Height="110" RowDefinitions="32,78">
+                                        <TextBlock Classes="white"
+                                                   Width="276"
+                                                   Height="32"
+                                                   FontSize="18"
+                                                   TextAlignment="Center"
+                                                   Text="VOLUME" />
+                                        <Grid Grid.Row="1"
+                                              Width="276"
+                                              Height="78"
+                                              ColumnDefinitions="132,132"
+                                              ColumnSpacing="6">
+                                            <Border Grid.Column="0" Classes="buttonFrame" Width="132" Height="72">
+                                                <Viewbox Stretch="Uniform">
+                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="▲" />
+                                                </Viewbox>
+                                            </Border>
+                                            <Border Grid.Column="1" Classes="buttonFrame" Width="132" Height="72">
+                                                <Viewbox Stretch="Uniform">
+                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="▼" />
+                                                </Viewbox>
+                                            </Border>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </Grid>
                         </Border>
 
-                        <ItemsControl ItemsSource="{Binding Connections}"
-                                      ItemTemplate="{StaticResource ConnectionTemplate}" />
-                    </StackPanel>
-                </Border>
+                        <Grid Grid.Column="1"
+                              Width="578"
+                              Height="631"
+                              RowDefinitions="116,114,375"
+                              RowSpacing="10">
+                            <Border Grid.Row="0" Classes="panel" Width="578" Height="116" Padding="8">
+                                <Grid Width="560"
+                                      Height="98"
+                                      ColumnDefinitions="180,180,182"
+                                      ColumnSpacing="6">
+                                    <Grid Grid.Column="0" Width="180" Height="92" RowDefinitions="28,64">
+                                        <TextBlock Classes="white" Width="180" Height="28" FontSize="18" TextAlignment="Center" Text="CODE 1" />
+                                        <Border Grid.Row="1" Classes="buttonFrame active" Width="180" Height="64">
+                                            <Viewbox Stretch="Fill">
+                                                <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" FontSize="1" Text="ON" />
+                                            </Viewbox>
+                                        </Border>
+                                    </Grid>
+                                    <Grid Grid.Column="1" Width="180" Height="92" RowDefinitions="28,64">
+                                        <TextBlock Classes="white" Width="180" Height="28" FontSize="18" TextAlignment="Center" Text="CODE 2" />
+                                        <Border Grid.Row="1" Classes="buttonFrame" Width="180" Height="64">
+                                            <Viewbox Stretch="Fill">
+                                                <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" FontSize="1"  Text="OFF" />
+                                            </Viewbox>
+                                        </Border>
+                                    </Grid>
+                                    <Grid Grid.Column="2" Width="182" Height="92" RowDefinitions="28,64">
+                                        <TextBlock Classes="white" Width="182" Height="28" FontSize="18" TextAlignment="Center" Text="CODE 3" />
+                                        <Border Grid.Row="1" Classes="buttonFrame" Width="182" Height="64">
+                                            <Viewbox Stretch="Fill">
+                                                <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" FontSize="1"  Text="OFF" />
+                                            </Viewbox>
+                                        </Border>
+                                    </Grid>
+                                </Grid>
+                            </Border>
 
-                <Border Grid.Row="1"
-                        Grid.Column="0"
-                        Grid.ColumnSpan="2"
-                        Classes="framePanel"
-                        Padding="18">
-                    <StackPanel Spacing="20">
-                        <StackPanel Spacing="4">
-                            <TextBlock Classes="sectionTitle"
-                                       Text="MQTT Topic Taxonomy" />
-                            <TextBlock Classes="mutedText"
-                                       TextAlignment="Center"
-                                       Text="The initial command, state, and configuration channels the UI will need to consume or publish." />
-                        </StackPanel>
+                            <Border Grid.Row="1" Classes="panel" Width="578" Height="114" Padding="8">
+                                <Grid Width="560" Height="96" RowDefinitions="32,64">
+                                    <TextBlock Classes="white"
+                                               Width="560"
+                                               Height="32"
+                                               FontSize="18"
+                                               TextAlignment="Center"
+                                               Text="DIRECTIONALS" />
+                                    <Grid Grid.Row="1"
+                                          Width="560"
+                                          Height="64"
+                                          ColumnDefinitions="180,180,182"
+                                          ColumnSpacing="6">
+                                        <Border Grid.Column="0" Classes="buttonFrame" Width="180" Height="58">
+                                            <Viewbox Stretch="Uniform">
+                                                <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="◀" />
+                                            </Viewbox>
+                                        </Border>
+                                        <Border Grid.Column="1" Classes="buttonFrame" Width="180" Height="58">
+                                            <Viewbox Stretch="Uniform">
+                                                <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="◀▶" />
+                                            </Viewbox>
+                                        </Border>
+                                        <Border Grid.Column="2" Classes="buttonFrame active" Width="182" Height="58">
+                                            <Viewbox Stretch="Uniform">
+                                                <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="▶" />
+                                            </Viewbox>
+                                        </Border>
+                                    </Grid>
+                                </Grid>
+                            </Border>
 
-                        <ItemsControl ItemsSource="{Binding TopicGroups}"
-                                      ItemTemplate="{StaticResource TopicTemplate}" />
-                    </StackPanel>
-                </Border>
-            </Grid>
-        </ScrollViewer>
+                            <Grid Grid.Row="2"
+                                  Width="572"
+                                  Height="375"
+                                  ColumnDefinitions="183,183,186"
+                                  ColumnSpacing="8">
+                                <Grid Grid.Column="0" Width="183" Height="369" RowDefinitions="176,185" RowSpacing="8" VerticalAlignment="Top">
+                                    <Border Grid.Row="0" Classes="panel" Width="175" Height="176" Padding="8">
+                                        <Grid Width="157" Height="158" RowDefinitions="28,130">
+                                            <TextBlock Classes="white"
+                                                       Width="157"
+                                                       Height="28"
+                                                       FontSize="20"
+                                                       TextAlignment="Center"
+                                                       Text="L / S" />
+                                            <Border Grid.Row="1" Classes="buttonFrame" Width="157" Height="130">
+                                                <TextBlock Classes="white"
+                                                           Width="157"
+                                                           Height="130"
+                                                           FontSize="50"
+                                                           TextAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           Text="L / S&#x0a;OFF" />
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+
+                                    <Border Grid.Row="1" Classes="panel" Width="175" Height="185" Padding="8">
+                                        <Grid Width="157" Height="167" RowDefinitions="28,139">
+                                            <TextBlock Classes="white"
+                                                       Width="157"
+                                                       Height="28"
+                                                       FontSize="13.333"
+                                                       TextAlignment="Center"
+                                                       Text="EXT AUDIO" />
+                                            <Border Grid.Row="1" Classes="buttonFrame" Width="157" Height="139">
+                                                <TextBlock Classes="white"
+                                                           Width="157"
+                                                           Height="139"
+                                                           FontSize="50"
+                                                           TextAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           Text="OFF" />
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+
+                                <Border Grid.Column="1" Classes="panel" Width="183" Height="179" Padding="8" VerticalAlignment="Top">
+                                    <Grid Width="165" Height="161" RowDefinitions="28,133">
+                                        <TextBlock Classes="white"
+                                                   Width="165"
+                                                   Height="28"
+                                                   FontSize="18"
+                                                   TextAlignment="Center"
+                                                   Text="MEMO" />
+                                        <Border Grid.Row="1" Classes="buttonFrame" Width="165" Height="133">
+                                            <Viewbox Stretch="Fill">
+                                                <TextBlock Classes="white"
+                                                           TextAlignment="Center"
+                                                           Width="157"
+                                                           Height="139"
+                                                           FontSize="50"
+                                                           VerticalAlignment="Center"
+                                                           Text="REC" />
+                                            </Viewbox>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+
+                                <Border Grid.Column="2" Classes="panel" Width="186" Height="176" Padding="8" VerticalAlignment="Top">
+                                    <Grid Width="168" Height="158" RowDefinitions="28,130">
+                                        <TextBlock Classes="white"
+                                                   Width="168"
+                                                   Height="28"
+                                                   FontSize="18"
+                                                   TextAlignment="Center"
+                                                   Text="AM / FM" />
+                                        <Border Grid.Row="1" Classes="buttonFrame" Width="168" Height="130">
+                                            <Viewbox Stretch="Fill">
+                                                <TextBlock Classes="white"
+                                                           TextAlignment="Center"
+                                                           Width="157"
+                                                           Height="139"
+                                                           FontSize="50"
+                                                           VerticalAlignment="Center"
+                                                           Text="MUTE" />
+                                            </Viewbox>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </Window>
