@@ -40,10 +40,6 @@
 			labelFastFooter = new Label();
 			labelFastValue = new Label();
 			labelFastTitle = new Label();
-			panelMetricPatrol = new Panel();
-			labelPatrolFooter = new Label();
-			labelPatrolValue = new Label();
-			labelPatrolTitle = new Label();
 			panelTalkRadio = new Panel();
 			talkButtonsLayout = new TableLayoutPanel();
 			btnPri = new Button();
@@ -60,7 +56,6 @@
 			btnRec = new Button();
 			btnStop = new Button();
 			btnAutoz = new Button();
-			labelCameraModes = new Label();
 			panelFooter = new Panel();
 			footerLayout = new TableLayoutPanel();
 			panelClock = new Panel();
@@ -86,9 +81,11 @@
 			panelRadioColumn = new Panel();
 			radioColumnLayout = new TableLayoutPanel();
 			panelRadioDetails = new Panel();
-			labelTxRx = new Label();
-			panelSignalBars = new Panel();
-			labelRadioInfo = new Label();
+			label5 = new Label();
+			label4 = new Label();
+			label3 = new Label();
+			label2 = new Label();
+			label1 = new Label();
 			labelRadioHeader = new Label();
 			panelProximity = new Panel();
 			proximityButtonsLayout = new TableLayoutPanel();
@@ -146,13 +143,14 @@
 			labelCadPlaceholder = new Label();
 			tabPageCamera = new TabPage();
 			labelCameraPlaceholder = new Label();
+			labelTxRx = new Label();
+			panelSignalBars = new Panel();
 			mainLayout.SuspendLayout();
 			leftSidebarLayout.SuspendLayout();
 			panelTopMetrics.SuspendLayout();
 			topMetricsLayout.SuspendLayout();
 			panelMetricTgt.SuspendLayout();
 			panelMetricFast.SuspendLayout();
-			panelMetricPatrol.SuspendLayout();
 			panelTalkRadio.SuspendLayout();
 			talkButtonsLayout.SuspendLayout();
 			panelAlertStatus.SuspendLayout();
@@ -232,11 +230,11 @@
 			leftSidebarLayout.Margin = new Padding(0, 0, 10, 0);
 			leftSidebarLayout.Name = "leftSidebarLayout";
 			leftSidebarLayout.RowCount = 6;
-			leftSidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 98F));
-			leftSidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 150F));
-			leftSidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 124F));
-			leftSidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
-			leftSidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 138F));
+			leftSidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 97F));
+			leftSidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 190F));
+			leftSidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 162F));
+			leftSidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 75F));
+			leftSidebarLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 130F));
 			leftSidebarLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 			leftSidebarLayout.Size = new Size(304, 748);
 			leftSidebarLayout.TabIndex = 0;
@@ -251,24 +249,23 @@
 			panelTopMetrics.Margin = new Padding(0, 0, 0, 10);
 			panelTopMetrics.Name = "panelTopMetrics";
 			panelTopMetrics.Padding = new Padding(8);
-			panelTopMetrics.Size = new Size(304, 88);
+			panelTopMetrics.Size = new Size(304, 87);
 			panelTopMetrics.TabIndex = 0;
 			// 
 			// topMetricsLayout
 			// 
 			topMetricsLayout.ColumnCount = 3;
 			topMetricsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33333F));
-			topMetricsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33333F));
-			topMetricsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33334F));
+			topMetricsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 63.9860153F));
+			topMetricsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 2.79720283F));
 			topMetricsLayout.Controls.Add(panelMetricTgt, 0, 0);
 			topMetricsLayout.Controls.Add(panelMetricFast, 1, 0);
-			topMetricsLayout.Controls.Add(panelMetricPatrol, 2, 0);
 			topMetricsLayout.Dock = DockStyle.Fill;
 			topMetricsLayout.Location = new Point(8, 8);
 			topMetricsLayout.Name = "topMetricsLayout";
 			topMetricsLayout.RowCount = 1;
 			topMetricsLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-			topMetricsLayout.Size = new Size(286, 70);
+			topMetricsLayout.Size = new Size(286, 69);
 			topMetricsLayout.TabIndex = 0;
 			// 
 			// panelMetricTgt
@@ -279,7 +276,7 @@
 			panelMetricTgt.Dock = DockStyle.Fill;
 			panelMetricTgt.Location = new Point(3, 3);
 			panelMetricTgt.Name = "panelMetricTgt";
-			panelMetricTgt.Size = new Size(89, 64);
+			panelMetricTgt.Size = new Size(89, 63);
 			panelMetricTgt.TabIndex = 0;
 			// 
 			// labelTgtFooter
@@ -297,7 +294,7 @@
 			// labelTgtValue
 			// 
 			labelTgtValue.Dock = DockStyle.Top;
-			labelTgtValue.Font = new Font("Segoe UI", 20F, FontStyle.Bold);
+			labelTgtValue.Font = new Font("Segoe UI", 15F, FontStyle.Bold);
 			labelTgtValue.ForeColor = Color.FromArgb(155, 214, 83);
 			labelTgtValue.Location = new Point(0, 24);
 			labelTgtValue.Name = "labelTgtValue";
@@ -309,13 +306,13 @@
 			// labelTgtTitle
 			// 
 			labelTgtTitle.Dock = DockStyle.Top;
-			labelTgtTitle.Font = new Font("Segoe UI", 13F, FontStyle.Bold);
+			labelTgtTitle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
 			labelTgtTitle.ForeColor = Color.White;
 			labelTgtTitle.Location = new Point(0, 0);
 			labelTgtTitle.Name = "labelTgtTitle";
 			labelTgtTitle.Size = new Size(89, 24);
 			labelTgtTitle.TabIndex = 2;
-			labelTgtTitle.Text = "TGT";
+			labelTgtTitle.Text = "SPD";
 			labelTgtTitle.TextAlign = ContentAlignment.MiddleCenter;
 			// 
 			// panelMetricFast
@@ -326,7 +323,7 @@
 			panelMetricFast.Dock = DockStyle.Fill;
 			panelMetricFast.Location = new Point(98, 3);
 			panelMetricFast.Name = "panelMetricFast";
-			panelMetricFast.Size = new Size(89, 64);
+			panelMetricFast.Size = new Size(176, 63);
 			panelMetricFast.TabIndex = 1;
 			// 
 			// labelFastFooter
@@ -336,7 +333,7 @@
 			labelFastFooter.ForeColor = Color.Gainsboro;
 			labelFastFooter.Location = new Point(0, 66);
 			labelFastFooter.Name = "labelFastFooter";
-			labelFastFooter.Size = new Size(89, 0);
+			labelFastFooter.Size = new Size(176, 0);
 			labelFastFooter.TabIndex = 0;
 			labelFastFooter.Text = "FRONT   SLOW";
 			labelFastFooter.TextAlign = ContentAlignment.TopCenter;
@@ -344,73 +341,26 @@
 			// labelFastValue
 			// 
 			labelFastValue.Dock = DockStyle.Top;
-			labelFastValue.Font = new Font("Segoe UI", 20F, FontStyle.Bold);
+			labelFastValue.Font = new Font("Segoe UI", 8F, FontStyle.Bold);
 			labelFastValue.ForeColor = Color.FromArgb(155, 214, 83);
 			labelFastValue.Location = new Point(0, 24);
 			labelFastValue.Name = "labelFastValue";
-			labelFastValue.Size = new Size(89, 42);
+			labelFastValue.Size = new Size(176, 42);
 			labelFastValue.TabIndex = 1;
-			labelFastValue.Text = "76";
+			labelFastValue.Text = "30.5422, -97.6384";
 			labelFastValue.TextAlign = ContentAlignment.MiddleCenter;
 			// 
 			// labelFastTitle
 			// 
 			labelFastTitle.Dock = DockStyle.Top;
-			labelFastTitle.Font = new Font("Segoe UI", 13F, FontStyle.Bold);
+			labelFastTitle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
 			labelFastTitle.ForeColor = Color.White;
 			labelFastTitle.Location = new Point(0, 0);
 			labelFastTitle.Name = "labelFastTitle";
-			labelFastTitle.Size = new Size(89, 24);
+			labelFastTitle.Size = new Size(176, 24);
 			labelFastTitle.TabIndex = 2;
-			labelFastTitle.Text = "FAST";
+			labelFastTitle.Text = "LOCATION";
 			labelFastTitle.TextAlign = ContentAlignment.MiddleCenter;
-			// 
-			// panelMetricPatrol
-			// 
-			panelMetricPatrol.Controls.Add(labelPatrolFooter);
-			panelMetricPatrol.Controls.Add(labelPatrolValue);
-			panelMetricPatrol.Controls.Add(labelPatrolTitle);
-			panelMetricPatrol.Dock = DockStyle.Fill;
-			panelMetricPatrol.Location = new Point(193, 3);
-			panelMetricPatrol.Name = "panelMetricPatrol";
-			panelMetricPatrol.Size = new Size(90, 64);
-			panelMetricPatrol.TabIndex = 2;
-			// 
-			// labelPatrolFooter
-			// 
-			labelPatrolFooter.Dock = DockStyle.Fill;
-			labelPatrolFooter.Font = new Font("Segoe UI", 8F, FontStyle.Bold);
-			labelPatrolFooter.ForeColor = Color.Gainsboro;
-			labelPatrolFooter.Location = new Point(0, 66);
-			labelPatrolFooter.Name = "labelPatrolFooter";
-			labelPatrolFooter.Size = new Size(90, 0);
-			labelPatrolFooter.TabIndex = 0;
-			labelPatrolFooter.Text = "SAME   RFI   LOV";
-			labelPatrolFooter.TextAlign = ContentAlignment.TopCenter;
-			// 
-			// labelPatrolValue
-			// 
-			labelPatrolValue.Dock = DockStyle.Top;
-			labelPatrolValue.Font = new Font("Segoe UI", 20F, FontStyle.Bold);
-			labelPatrolValue.ForeColor = Color.FromArgb(155, 214, 83);
-			labelPatrolValue.Location = new Point(0, 24);
-			labelPatrolValue.Name = "labelPatrolValue";
-			labelPatrolValue.Size = new Size(90, 42);
-			labelPatrolValue.TabIndex = 1;
-			labelPatrolValue.Text = "54";
-			labelPatrolValue.TextAlign = ContentAlignment.MiddleCenter;
-			// 
-			// labelPatrolTitle
-			// 
-			labelPatrolTitle.Dock = DockStyle.Top;
-			labelPatrolTitle.Font = new Font("Segoe UI", 13F, FontStyle.Bold);
-			labelPatrolTitle.ForeColor = Color.White;
-			labelPatrolTitle.Location = new Point(0, 0);
-			labelPatrolTitle.Name = "labelPatrolTitle";
-			labelPatrolTitle.Size = new Size(90, 24);
-			labelPatrolTitle.TabIndex = 2;
-			labelPatrolTitle.Text = "PATROL";
-			labelPatrolTitle.TextAlign = ContentAlignment.MiddleCenter;
 			// 
 			// panelTalkRadio
 			// 
@@ -420,11 +370,11 @@
 			panelTalkRadio.Controls.Add(labelRadioChannel);
 			panelTalkRadio.Controls.Add(labelTalkRadio);
 			panelTalkRadio.Dock = DockStyle.Fill;
-			panelTalkRadio.Location = new Point(0, 98);
+			panelTalkRadio.Location = new Point(0, 97);
 			panelTalkRadio.Margin = new Padding(0, 0, 0, 10);
 			panelTalkRadio.Name = "panelTalkRadio";
 			panelTalkRadio.Padding = new Padding(12);
-			panelTalkRadio.Size = new Size(304, 140);
+			panelTalkRadio.Size = new Size(304, 180);
 			panelTalkRadio.TabIndex = 1;
 			// 
 			// talkButtonsLayout
@@ -437,58 +387,61 @@
 			talkButtonsLayout.Controls.Add(btnTac, 1, 0);
 			talkButtonsLayout.Controls.Add(btnScan, 2, 0);
 			talkButtonsLayout.Dock = DockStyle.Bottom;
-			talkButtonsLayout.Location = new Point(12, 62);
+			talkButtonsLayout.Location = new Point(12, 79);
 			talkButtonsLayout.Name = "talkButtonsLayout";
 			talkButtonsLayout.RowCount = 1;
 			talkButtonsLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-			talkButtonsLayout.Size = new Size(278, 64);
+			talkButtonsLayout.Size = new Size(278, 87);
 			talkButtonsLayout.TabIndex = 0;
 			// 
 			// btnPri
 			// 
+			btnPri.Dock = DockStyle.Fill;
 			btnPri.Location = new Point(3, 3);
 			btnPri.Name = "btnPri";
-			btnPri.Size = new Size(86, 58);
+			btnPri.Size = new Size(86, 81);
 			btnPri.TabIndex = 0;
-			btnPri.Text = "PRI";
+			btnPri.Text = "CH UP";
 			// 
 			// btnTac
 			// 
+			btnTac.Dock = DockStyle.Fill;
 			btnTac.Location = new Point(95, 3);
 			btnTac.Name = "btnTac";
-			btnTac.Size = new Size(86, 58);
+			btnTac.Size = new Size(86, 81);
 			btnTac.TabIndex = 1;
-			btnTac.Text = "TAC";
+			btnTac.Text = "CH DN";
 			// 
 			// btnScan
 			// 
+			btnScan.Dock = DockStyle.Fill;
 			btnScan.Location = new Point(187, 3);
 			btnScan.Name = "btnScan";
-			btnScan.Size = new Size(88, 58);
+			btnScan.Size = new Size(88, 81);
 			btnScan.TabIndex = 2;
 			btnScan.Text = "SCAN";
 			// 
 			// labelRadioChannel
 			// 
 			labelRadioChannel.Dock = DockStyle.Top;
-			labelRadioChannel.Font = new Font("Segoe UI", 16F, FontStyle.Bold);
+			labelRadioChannel.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
 			labelRadioChannel.ForeColor = Color.White;
-			labelRadioChannel.Location = new Point(12, 56);
+			labelRadioChannel.Location = new Point(12, 47);
 			labelRadioChannel.Name = "labelRadioChannel";
-			labelRadioChannel.Size = new Size(278, 44);
+			labelRadioChannel.Size = new Size(278, 29);
 			labelRadioChannel.TabIndex = 1;
-			labelRadioChannel.Text = "RADIO CH :  M 1/5/7";
+			labelRadioChannel.Text = "RADIO CH: CT OPS 800";
 			// 
 			// labelTalkRadio
 			// 
 			labelTalkRadio.Dock = DockStyle.Top;
-			labelTalkRadio.Font = new Font("Segoe UI", 14F, FontStyle.Bold);
+			labelTalkRadio.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
 			labelTalkRadio.ForeColor = Color.White;
 			labelTalkRadio.Location = new Point(12, 12);
 			labelTalkRadio.Name = "labelTalkRadio";
-			labelTalkRadio.Size = new Size(278, 44);
+			labelTalkRadio.Size = new Size(278, 35);
 			labelTalkRadio.TabIndex = 2;
-			labelTalkRadio.Text = "TALK RADIO :  UHF";
+			labelTalkRadio.Text = "TALK RADIO: APX7500 V/8";
 			// 
 			// panelAlertStatus
 			// 
@@ -496,11 +449,11 @@
 			panelAlertStatus.BorderStyle = BorderStyle.FixedSingle;
 			panelAlertStatus.Controls.Add(labelAlertStatus);
 			panelAlertStatus.Dock = DockStyle.Fill;
-			panelAlertStatus.Location = new Point(0, 248);
+			panelAlertStatus.Location = new Point(0, 287);
 			panelAlertStatus.Margin = new Padding(0, 0, 0, 10);
 			panelAlertStatus.Name = "panelAlertStatus";
 			panelAlertStatus.Padding = new Padding(12);
-			panelAlertStatus.Size = new Size(304, 114);
+			panelAlertStatus.Size = new Size(304, 152);
 			panelAlertStatus.TabIndex = 2;
 			// 
 			// labelAlertStatus
@@ -510,9 +463,9 @@
 			labelAlertStatus.ForeColor = Color.White;
 			labelAlertStatus.Location = new Point(12, 12);
 			labelAlertStatus.Name = "labelAlertStatus";
-			labelAlertStatus.Size = new Size(278, 88);
+			labelAlertStatus.Size = new Size(278, 126);
 			labelAlertStatus.TabIndex = 0;
-			labelAlertStatus.Text = "ALERT L/S :  R AMB\r\nDIRECTIONAL :  RIGHT\r\nSCENE :  LA / TD / RA\r\nSIREN :  DISABLED";
+			labelAlertStatus.Text = "ALERT L/S :  CODE 1\r\nDIRECTIONAL :  RIGHT\r\nSCENE :  LA / TD / RA\r\nSIREN :  DISABLED";
 			// 
 			// panelCadMessage
 			// 
@@ -520,11 +473,11 @@
 			panelCadMessage.BorderStyle = BorderStyle.FixedSingle;
 			panelCadMessage.Controls.Add(labelCadMessage);
 			panelCadMessage.Dock = DockStyle.Fill;
-			panelCadMessage.Location = new Point(0, 372);
+			panelCadMessage.Location = new Point(0, 449);
 			panelCadMessage.Margin = new Padding(0, 0, 0, 10);
 			panelCadMessage.Name = "panelCadMessage";
 			panelCadMessage.Padding = new Padding(12, 10, 12, 10);
-			panelCadMessage.Size = new Size(304, 38);
+			panelCadMessage.Size = new Size(304, 65);
 			panelCadMessage.TabIndex = 3;
 			// 
 			// labelCadMessage
@@ -534,9 +487,9 @@
 			labelCadMessage.ForeColor = Color.White;
 			labelCadMessage.Location = new Point(12, 10);
 			labelCadMessage.Name = "labelCadMessage";
-			labelCadMessage.Size = new Size(278, 16);
+			labelCadMessage.Size = new Size(278, 43);
 			labelCadMessage.TabIndex = 0;
-			labelCadMessage.Text = "CAD MSG :  1";
+			labelCadMessage.Text = "IDK YET";
 			labelCadMessage.TextAlign = ContentAlignment.MiddleCenter;
 			// 
 			// panelCamera
@@ -544,13 +497,12 @@
 			panelCamera.BackColor = Color.FromArgb(25, 25, 25);
 			panelCamera.BorderStyle = BorderStyle.FixedSingle;
 			panelCamera.Controls.Add(cameraButtonsLayout);
-			panelCamera.Controls.Add(labelCameraModes);
 			panelCamera.Dock = DockStyle.Fill;
-			panelCamera.Location = new Point(0, 420);
+			panelCamera.Location = new Point(0, 524);
 			panelCamera.Margin = new Padding(0, 0, 0, 10);
 			panelCamera.Name = "panelCamera";
 			panelCamera.Padding = new Padding(12);
-			panelCamera.Size = new Size(304, 128);
+			panelCamera.Size = new Size(304, 120);
 			panelCamera.TabIndex = 4;
 			// 
 			// cameraButtonsLayout
@@ -563,18 +515,18 @@
 			cameraButtonsLayout.Controls.Add(btnStop, 1, 0);
 			cameraButtonsLayout.Controls.Add(btnAutoz, 2, 0);
 			cameraButtonsLayout.Dock = DockStyle.Bottom;
-			cameraButtonsLayout.Location = new Point(12, 42);
+			cameraButtonsLayout.Location = new Point(12, 7);
 			cameraButtonsLayout.Name = "cameraButtonsLayout";
 			cameraButtonsLayout.RowCount = 1;
 			cameraButtonsLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-			cameraButtonsLayout.Size = new Size(278, 72);
+			cameraButtonsLayout.Size = new Size(278, 99);
 			cameraButtonsLayout.TabIndex = 0;
 			// 
 			// btnRec
 			// 
 			btnRec.Location = new Point(3, 3);
 			btnRec.Name = "btnRec";
-			btnRec.Size = new Size(86, 66);
+			btnRec.Size = new Size(86, 93);
 			btnRec.TabIndex = 0;
 			btnRec.Text = "REC";
 			// 
@@ -582,28 +534,18 @@
 			// 
 			btnStop.Location = new Point(95, 3);
 			btnStop.Name = "btnStop";
-			btnStop.Size = new Size(86, 66);
+			btnStop.Size = new Size(86, 93);
 			btnStop.TabIndex = 1;
 			btnStop.Text = "STOP";
 			// 
 			// btnAutoz
 			// 
+			btnAutoz.Font = new Font("Segoe UI", 8F, FontStyle.Bold);
 			btnAutoz.Location = new Point(187, 3);
 			btnAutoz.Name = "btnAutoz";
-			btnAutoz.Size = new Size(88, 66);
+			btnAutoz.Size = new Size(88, 93);
 			btnAutoz.TabIndex = 2;
 			btnAutoz.Text = "AUTOZ";
-			// 
-			// labelCameraModes
-			// 
-			labelCameraModes.Dock = DockStyle.Top;
-			labelCameraModes.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-			labelCameraModes.ForeColor = Color.FromArgb(155, 214, 83);
-			labelCameraModes.Location = new Point(12, 12);
-			labelCameraModes.Name = "labelCameraModes";
-			labelCameraModes.Size = new Size(278, 24);
-			labelCameraModes.TabIndex = 1;
-			labelCameraModes.Text = "CAM1   CAM2   F1   F2   MIC";
 			// 
 			// panelFooter
 			// 
@@ -611,18 +553,18 @@
 			panelFooter.BorderStyle = BorderStyle.FixedSingle;
 			panelFooter.Controls.Add(footerLayout);
 			panelFooter.Dock = DockStyle.Fill;
-			panelFooter.Location = new Point(3, 561);
+			panelFooter.Location = new Point(3, 657);
 			panelFooter.Name = "panelFooter";
 			panelFooter.Padding = new Padding(8);
-			panelFooter.Size = new Size(298, 184);
+			panelFooter.Size = new Size(298, 88);
 			panelFooter.TabIndex = 5;
 			// 
 			// footerLayout
 			// 
 			footerLayout.ColumnCount = 3;
-			footerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 43F));
-			footerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 22F));
-			footerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35F));
+			footerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48F));
+			footerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25.7142849F));
+			footerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 26.4285717F));
 			footerLayout.Controls.Add(panelClock, 0, 0);
 			footerLayout.Controls.Add(panelVol, 1, 0);
 			footerLayout.Controls.Add(btnE911, 2, 0);
@@ -631,7 +573,7 @@
 			footerLayout.Name = "footerLayout";
 			footerLayout.RowCount = 1;
 			footerLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-			footerLayout.Size = new Size(280, 166);
+			footerLayout.Size = new Size(280, 70);
 			footerLayout.TabIndex = 0;
 			// 
 			// panelClock
@@ -641,69 +583,72 @@
 			panelClock.Dock = DockStyle.Fill;
 			panelClock.Location = new Point(3, 3);
 			panelClock.Name = "panelClock";
-			panelClock.Size = new Size(114, 160);
+			panelClock.Size = new Size(128, 64);
 			panelClock.TabIndex = 0;
 			// 
 			// labelDate
 			// 
 			labelDate.Dock = DockStyle.Top;
-			labelDate.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+			labelDate.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
 			labelDate.ForeColor = Color.White;
-			labelDate.Location = new Point(0, 40);
+			labelDate.Location = new Point(0, 34);
 			labelDate.Name = "labelDate";
-			labelDate.Size = new Size(114, 24);
+			labelDate.Size = new Size(128, 23);
 			labelDate.TabIndex = 0;
 			labelDate.Text = "18 JUN 2009";
 			// 
 			// labelClock
 			// 
 			labelClock.Dock = DockStyle.Top;
-			labelClock.Font = new Font("Segoe UI", 17F, FontStyle.Bold);
+			labelClock.Font = new Font("Segoe UI", 13F, FontStyle.Bold);
 			labelClock.ForeColor = Color.White;
 			labelClock.Location = new Point(0, 0);
 			labelClock.Name = "labelClock";
-			labelClock.Size = new Size(114, 40);
+			labelClock.Size = new Size(128, 34);
 			labelClock.TabIndex = 1;
 			labelClock.Text = "10:53:02";
+			labelClock.TextAlign = ContentAlignment.MiddleLeft;
 			// 
 			// panelVol
 			// 
 			panelVol.Controls.Add(labelVolValue);
 			panelVol.Controls.Add(labelVolTitle);
 			panelVol.Dock = DockStyle.Fill;
-			panelVol.Location = new Point(123, 3);
+			panelVol.Location = new Point(137, 3);
 			panelVol.Name = "panelVol";
-			panelVol.Size = new Size(55, 160);
+			panelVol.Size = new Size(65, 64);
 			panelVol.TabIndex = 1;
 			// 
 			// labelVolValue
 			// 
 			labelVolValue.Dock = DockStyle.Top;
-			labelVolValue.Font = new Font("Segoe UI", 18F, FontStyle.Bold);
+			labelVolValue.Font = new Font("Segoe UI", 14F, FontStyle.Bold);
 			labelVolValue.ForeColor = Color.FromArgb(155, 214, 83);
-			labelVolValue.Location = new Point(0, 32);
+			labelVolValue.Location = new Point(0, 26);
 			labelVolValue.Name = "labelVolValue";
-			labelVolValue.Size = new Size(55, 34);
+			labelVolValue.Size = new Size(65, 37);
 			labelVolValue.TabIndex = 0;
 			labelVolValue.Text = "13";
+			labelVolValue.TextAlign = ContentAlignment.TopCenter;
 			// 
 			// labelVolTitle
 			// 
 			labelVolTitle.Dock = DockStyle.Top;
-			labelVolTitle.Font = new Font("Segoe UI", 16F, FontStyle.Bold);
+			labelVolTitle.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
 			labelVolTitle.ForeColor = Color.White;
 			labelVolTitle.Location = new Point(0, 0);
 			labelVolTitle.Name = "labelVolTitle";
-			labelVolTitle.Size = new Size(55, 32);
+			labelVolTitle.Size = new Size(65, 26);
 			labelVolTitle.TabIndex = 1;
 			labelVolTitle.Text = "VOL";
+			labelVolTitle.TextAlign = ContentAlignment.MiddleCenter;
 			// 
 			// btnE911
 			// 
 			btnE911.Dock = DockStyle.Fill;
-			btnE911.Location = new Point(184, 3);
+			btnE911.Location = new Point(208, 3);
 			btnE911.Name = "btnE911";
-			btnE911.Size = new Size(93, 160);
+			btnE911.Size = new Size(69, 64);
 			btnE911.TabIndex = 2;
 			btnE911.Text = "E-911";
 			// 
@@ -885,7 +830,7 @@
 			radioColumnLayout.Location = new Point(8, 8);
 			radioColumnLayout.Name = "radioColumnLayout";
 			radioColumnLayout.RowCount = 3;
-			radioColumnLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 132F));
+			radioColumnLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 233F));
 			radioColumnLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 			radioColumnLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 138F));
 			radioColumnLayout.Size = new Size(304, 619);
@@ -895,58 +840,91 @@
 			// 
 			panelRadioDetails.BackColor = Color.FromArgb(25, 25, 25);
 			panelRadioDetails.BorderStyle = BorderStyle.FixedSingle;
-			panelRadioDetails.Controls.Add(labelTxRx);
-			panelRadioDetails.Controls.Add(panelSignalBars);
-			panelRadioDetails.Controls.Add(labelRadioInfo);
+			panelRadioDetails.Controls.Add(label5);
+			panelRadioDetails.Controls.Add(label4);
+			panelRadioDetails.Controls.Add(label3);
+			panelRadioDetails.Controls.Add(label2);
+			panelRadioDetails.Controls.Add(label1);
 			panelRadioDetails.Controls.Add(labelRadioHeader);
 			panelRadioDetails.Dock = DockStyle.Fill;
 			panelRadioDetails.Location = new Point(0, 0);
 			panelRadioDetails.Margin = new Padding(0, 0, 0, 10);
 			panelRadioDetails.Name = "panelRadioDetails";
 			panelRadioDetails.Padding = new Padding(10);
-			panelRadioDetails.Size = new Size(304, 122);
+			panelRadioDetails.Size = new Size(304, 223);
 			panelRadioDetails.TabIndex = 0;
 			// 
-			// labelTxRx
+			// label5
 			// 
-			labelTxRx.Font = new Font("Segoe UI", 13F, FontStyle.Bold);
-			labelTxRx.ForeColor = Color.White;
-			labelTxRx.Location = new Point(236, 94);
-			labelTxRx.Name = "labelTxRx";
-			labelTxRx.Size = new Size(74, 24);
-			labelTxRx.TabIndex = 0;
-			labelTxRx.Text = "TX   RX";
+			label5.Dock = DockStyle.Top;
+			label5.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+			label5.ForeColor = Color.White;
+			label5.Location = new Point(10, 180);
+			label5.Name = "label5";
+			label5.Size = new Size(282, 34);
+			label5.TabIndex = 8;
+			label5.Text = "RADIO 6: ABIA TWR";
+			label5.TextAlign = ContentAlignment.MiddleLeft;
 			// 
-			// panelSignalBars
+			// label4
 			// 
-			panelSignalBars.BackColor = Color.FromArgb(40, 40, 40);
-			panelSignalBars.BorderStyle = BorderStyle.FixedSingle;
-			panelSignalBars.Location = new Point(238, 34);
-			panelSignalBars.Name = "panelSignalBars";
-			panelSignalBars.Size = new Size(68, 58);
-			panelSignalBars.TabIndex = 1;
+			label4.Dock = DockStyle.Top;
+			label4.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+			label4.ForeColor = Color.White;
+			label4.Location = new Point(10, 146);
+			label4.Name = "label4";
+			label4.Size = new Size(282, 34);
+			label4.TabIndex = 7;
+			label4.Text = "RADIO 5: $CMD_1";
+			label4.TextAlign = ContentAlignment.MiddleLeft;
 			// 
-			// labelRadioInfo
+			// label3
 			// 
-			labelRadioInfo.Dock = DockStyle.Left;
-			labelRadioInfo.Font = new Font("Segoe UI", 14F, FontStyle.Bold);
-			labelRadioInfo.ForeColor = Color.White;
-			labelRadioInfo.Location = new Point(10, 44);
-			labelRadioInfo.Name = "labelRadioInfo";
-			labelRadioInfo.Size = new Size(190, 66);
-			labelRadioInfo.TabIndex = 2;
-			labelRadioInfo.Text = "CH:  M 1/5/7\r\nAREA:  5TH PRECINCT\r\nDIV:  MANHATTAN\r\nVOL:  18";
+			label3.Dock = DockStyle.Top;
+			label3.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+			label3.ForeColor = Color.White;
+			label3.Location = new Point(10, 112);
+			label3.Name = "label3";
+			label3.Size = new Size(282, 34);
+			label3.TabIndex = 6;
+			label3.Text = "RADIO 4: CT ALE M";
+			label3.TextAlign = ContentAlignment.MiddleLeft;
+			// 
+			// label2
+			// 
+			label2.Dock = DockStyle.Top;
+			label2.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+			label2.ForeColor = Color.White;
+			label2.Location = new Point(10, 78);
+			label2.Name = "label2";
+			label2.Size = new Size(282, 34);
+			label2.TabIndex = 5;
+			label2.Text = "RADIO 3: TXT MAIN";
+			label2.TextAlign = ContentAlignment.MiddleLeft;
+			// 
+			// label1
+			// 
+			label1.Dock = DockStyle.Top;
+			label1.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+			label1.ForeColor = Color.White;
+			label1.Location = new Point(10, 44);
+			label1.Name = "label1";
+			label1.Size = new Size(282, 34);
+			label1.TabIndex = 4;
+			label1.Text = "RADIO 2: CT OPS V";
+			label1.TextAlign = ContentAlignment.MiddleLeft;
 			// 
 			// labelRadioHeader
 			// 
 			labelRadioHeader.Dock = DockStyle.Top;
-			labelRadioHeader.Font = new Font("Segoe UI", 16F, FontStyle.Bold);
+			labelRadioHeader.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
 			labelRadioHeader.ForeColor = Color.White;
 			labelRadioHeader.Location = new Point(10, 10);
 			labelRadioHeader.Name = "labelRadioHeader";
 			labelRadioHeader.Size = new Size(282, 34);
 			labelRadioHeader.TabIndex = 3;
-			labelRadioHeader.Text = "RADIO 1:  UHF";
+			labelRadioHeader.Text = "RADIO 1: CT OPS 800";
+			labelRadioHeader.TextAlign = ContentAlignment.MiddleLeft;
 			// 
 			// panelProximity
 			// 
@@ -955,11 +933,11 @@
 			panelProximity.Controls.Add(proximityButtonsLayout);
 			panelProximity.Controls.Add(labelProximityTitle);
 			panelProximity.Dock = DockStyle.Fill;
-			panelProximity.Location = new Point(0, 132);
+			panelProximity.Location = new Point(0, 233);
 			panelProximity.Margin = new Padding(0, 0, 0, 10);
 			panelProximity.Name = "panelProximity";
 			panelProximity.Padding = new Padding(10);
-			panelProximity.Size = new Size(304, 339);
+			panelProximity.Size = new Size(304, 238);
 			panelProximity.TabIndex = 1;
 			// 
 			// proximityButtonsLayout
@@ -977,40 +955,40 @@
 			proximityButtonsLayout.RowCount = 2;
 			proximityButtonsLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
 			proximityButtonsLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
-			proximityButtonsLayout.Size = new Size(282, 285);
+			proximityButtonsLayout.Size = new Size(282, 184);
 			proximityButtonsLayout.TabIndex = 0;
 			// 
 			// btnPrecinct1
 			// 
 			btnPrecinct1.Location = new Point(3, 3);
 			btnPrecinct1.Name = "btnPrecinct1";
-			btnPrecinct1.Size = new Size(135, 136);
+			btnPrecinct1.Size = new Size(135, 86);
 			btnPrecinct1.TabIndex = 0;
-			btnPrecinct1.Text = "1ST\r\nPRECINCT";
+			btnPrecinct1.Text = "CT OPS 800";
 			// 
 			// btnPrecinct6
 			// 
 			btnPrecinct6.Location = new Point(144, 3);
 			btnPrecinct6.Name = "btnPrecinct6";
-			btnPrecinct6.Size = new Size(135, 136);
+			btnPrecinct6.Size = new Size(135, 86);
 			btnPrecinct6.TabIndex = 1;
-			btnPrecinct6.Text = "6TH\r\nPRECINCT";
+			btnPrecinct6.Text = "DFW TAC1";
 			// 
 			// btnPrecinct7
 			// 
-			btnPrecinct7.Location = new Point(3, 145);
+			btnPrecinct7.Location = new Point(3, 95);
 			btnPrecinct7.Name = "btnPrecinct7";
-			btnPrecinct7.Size = new Size(135, 137);
+			btnPrecinct7.Size = new Size(135, 86);
 			btnPrecinct7.TabIndex = 2;
-			btnPrecinct7.Text = "7TH\r\nPRECINCT";
+			btnPrecinct7.Text = "$CMD_1";
 			// 
 			// btnPrecinct9
 			// 
-			btnPrecinct9.Location = new Point(144, 145);
+			btnPrecinct9.Location = new Point(144, 95);
 			btnPrecinct9.Name = "btnPrecinct9";
-			btnPrecinct9.Size = new Size(135, 137);
+			btnPrecinct9.Size = new Size(135, 86);
 			btnPrecinct9.TabIndex = 3;
-			btnPrecinct9.Text = "9TH\r\nPRECINCT";
+			btnPrecinct9.Text = "DFW_TWR_E";
 			// 
 			// labelProximityTitle
 			// 
@@ -1144,7 +1122,7 @@
 			btnAlert1.Name = "btnAlert1";
 			btnAlert1.Size = new Size(180, 64);
 			btnAlert1.TabIndex = 0;
-			btnAlert1.Text = "R AMB";
+			btnAlert1.Text = "ON";
 			// 
 			// labelAlert1
 			// 
@@ -1155,7 +1133,7 @@
 			labelAlert1.Name = "labelAlert1";
 			labelAlert1.Size = new Size(180, 28);
 			labelAlert1.TabIndex = 1;
-			labelAlert1.Text = "ALERT 1";
+			labelAlert1.Text = "CODE 1";
 			labelAlert1.TextAlign = ContentAlignment.MiddleCenter;
 			// 
 			// panelAlert2
@@ -1186,7 +1164,7 @@
 			labelAlert2.Name = "labelAlert2";
 			labelAlert2.Size = new Size(180, 28);
 			labelAlert2.TabIndex = 1;
-			labelAlert2.Text = "ALERT 2";
+			labelAlert2.Text = "CODE 2";
 			labelAlert2.TextAlign = ContentAlignment.MiddleCenter;
 			// 
 			// panelAlert3
@@ -1217,7 +1195,7 @@
 			labelAlert3.Name = "labelAlert3";
 			labelAlert3.Size = new Size(182, 28);
 			labelAlert3.TabIndex = 1;
-			labelAlert3.Text = "ALERT 3";
+			labelAlert3.Text = "CODE 3";
 			labelAlert3.TextAlign = ContentAlignment.MiddleCenter;
 			// 
 			// panelDirectionals
@@ -1290,9 +1268,9 @@
 			// lowerControlsLayout
 			// 
 			lowerControlsLayout.ColumnCount = 3;
-			lowerControlsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 29F));
-			lowerControlsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35.5F));
-			lowerControlsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35.5F));
+			lowerControlsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.0419579F));
+			lowerControlsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.39161F));
+			lowerControlsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.566433F));
 			lowerControlsLayout.Controls.Add(leftLowerLayout, 0, 0);
 			lowerControlsLayout.Controls.Add(panelMemo, 1, 0);
 			lowerControlsLayout.Controls.Add(panelAmFm, 2, 0);
@@ -1316,7 +1294,7 @@
 			leftLowerLayout.RowCount = 2;
 			leftLowerLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
 			leftLowerLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
-			leftLowerLayout.Size = new Size(159, 369);
+			leftLowerLayout.Size = new Size(183, 369);
 			leftLowerLayout.TabIndex = 0;
 			// 
 			// panelLsOff
@@ -1330,7 +1308,7 @@
 			panelLsOff.Margin = new Padding(0, 0, 8, 8);
 			panelLsOff.Name = "panelLsOff";
 			panelLsOff.Padding = new Padding(8);
-			panelLsOff.Size = new Size(151, 176);
+			panelLsOff.Size = new Size(175, 176);
 			panelLsOff.TabIndex = 0;
 			// 
 			// btnLsOff
@@ -1338,7 +1316,7 @@
 			btnLsOff.Dock = DockStyle.Fill;
 			btnLsOff.Location = new Point(8, 36);
 			btnLsOff.Name = "btnLsOff";
-			btnLsOff.Size = new Size(133, 130);
+			btnLsOff.Size = new Size(157, 130);
 			btnLsOff.TabIndex = 0;
 			btnLsOff.Text = "L / S\r\nOFF";
 			// 
@@ -1349,7 +1327,7 @@
 			labelLsOffTitle.ForeColor = Color.White;
 			labelLsOffTitle.Location = new Point(8, 8);
 			labelLsOffTitle.Name = "labelLsOffTitle";
-			labelLsOffTitle.Size = new Size(133, 28);
+			labelLsOffTitle.Size = new Size(157, 28);
 			labelLsOffTitle.TabIndex = 1;
 			labelLsOffTitle.Text = "L / S";
 			labelLsOffTitle.TextAlign = ContentAlignment.TopCenter;
@@ -1365,7 +1343,7 @@
 			panelExtAudio.Margin = new Padding(0, 0, 8, 0);
 			panelExtAudio.Name = "panelExtAudio";
 			panelExtAudio.Padding = new Padding(8);
-			panelExtAudio.Size = new Size(151, 185);
+			panelExtAudio.Size = new Size(175, 185);
 			panelExtAudio.TabIndex = 1;
 			// 
 			// btnExtAudio
@@ -1373,7 +1351,7 @@
 			btnExtAudio.Dock = DockStyle.Fill;
 			btnExtAudio.Location = new Point(8, 36);
 			btnExtAudio.Name = "btnExtAudio";
-			btnExtAudio.Size = new Size(133, 139);
+			btnExtAudio.Size = new Size(157, 139);
 			btnExtAudio.TabIndex = 0;
 			btnExtAudio.Text = "OFF\r\nSET";
 			// 
@@ -1384,7 +1362,7 @@
 			labelExtAudioTitle.ForeColor = Color.White;
 			labelExtAudioTitle.Location = new Point(8, 8);
 			labelExtAudioTitle.Name = "labelExtAudioTitle";
-			labelExtAudioTitle.Size = new Size(133, 28);
+			labelExtAudioTitle.Size = new Size(157, 28);
 			labelExtAudioTitle.TabIndex = 1;
 			labelExtAudioTitle.Text = "EXT AUDIO";
 			labelExtAudioTitle.TextAlign = ContentAlignment.MiddleCenter;
@@ -1395,11 +1373,11 @@
 			panelMemo.BorderStyle = BorderStyle.FixedSingle;
 			panelMemo.Controls.Add(btnMemo);
 			panelMemo.Controls.Add(labelMemoTitle);
-			panelMemo.Location = new Point(165, 0);
+			panelMemo.Location = new Point(189, 0);
 			panelMemo.Margin = new Padding(0, 0, 8, 0);
 			panelMemo.Name = "panelMemo";
 			panelMemo.Padding = new Padding(8);
-			panelMemo.Size = new Size(195, 179);
+			panelMemo.Size = new Size(183, 179);
 			panelMemo.TabIndex = 1;
 			// 
 			// btnMemo
@@ -1407,7 +1385,7 @@
 			btnMemo.Dock = DockStyle.Fill;
 			btnMemo.Location = new Point(8, 36);
 			btnMemo.Name = "btnMemo";
-			btnMemo.Size = new Size(177, 133);
+			btnMemo.Size = new Size(165, 133);
 			btnMemo.TabIndex = 0;
 			btnMemo.Text = "REC\r\nSET";
 			// 
@@ -1418,7 +1396,7 @@
 			labelMemoTitle.ForeColor = Color.White;
 			labelMemoTitle.Location = new Point(8, 8);
 			labelMemoTitle.Name = "labelMemoTitle";
-			labelMemoTitle.Size = new Size(177, 28);
+			labelMemoTitle.Size = new Size(165, 28);
 			labelMemoTitle.TabIndex = 1;
 			labelMemoTitle.Text = "MEMO";
 			labelMemoTitle.TextAlign = ContentAlignment.TopCenter;
@@ -1429,10 +1407,10 @@
 			panelAmFm.BorderStyle = BorderStyle.FixedSingle;
 			panelAmFm.Controls.Add(btnMute);
 			panelAmFm.Controls.Add(labelAmFmTitle);
-			panelAmFm.Location = new Point(371, 3);
+			panelAmFm.Location = new Point(383, 3);
 			panelAmFm.Name = "panelAmFm";
 			panelAmFm.Padding = new Padding(8);
-			panelAmFm.Size = new Size(198, 176);
+			panelAmFm.Size = new Size(186, 176);
 			panelAmFm.TabIndex = 2;
 			// 
 			// btnMute
@@ -1440,7 +1418,7 @@
 			btnMute.Dock = DockStyle.Fill;
 			btnMute.Location = new Point(8, 36);
 			btnMute.Name = "btnMute";
-			btnMute.Size = new Size(180, 130);
+			btnMute.Size = new Size(168, 130);
 			btnMute.TabIndex = 0;
 			btnMute.Text = "MUTE";
 			// 
@@ -1451,7 +1429,7 @@
 			labelAmFmTitle.ForeColor = Color.White;
 			labelAmFmTitle.Location = new Point(8, 8);
 			labelAmFmTitle.Name = "labelAmFmTitle";
-			labelAmFmTitle.Size = new Size(180, 28);
+			labelAmFmTitle.Size = new Size(168, 28);
 			labelAmFmTitle.TabIndex = 1;
 			labelAmFmTitle.Text = "AM / FM";
 			labelAmFmTitle.TextAlign = ContentAlignment.TopCenter;
@@ -1594,6 +1572,29 @@
 			labelCameraPlaceholder.Text = "Camera page\r\nDesigner-editable placeholder";
 			labelCameraPlaceholder.TextAlign = ContentAlignment.MiddleCenter;
 			// 
+			// labelTxRx
+			// 
+			labelTxRx.Dock = DockStyle.Fill;
+			labelTxRx.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+			labelTxRx.ForeColor = Color.White;
+			labelTxRx.Location = new Point(3, 42);
+			labelTxRx.Name = "labelTxRx";
+			labelTxRx.Size = new Size(73, 24);
+			labelTxRx.TabIndex = 0;
+			labelTxRx.Text = "TX   RX";
+			labelTxRx.TextAlign = ContentAlignment.MiddleCenter;
+			// 
+			// panelSignalBars
+			// 
+			panelSignalBars.BackColor = Color.FromArgb(40, 40, 40);
+			panelSignalBars.BorderStyle = BorderStyle.FixedSingle;
+			panelSignalBars.Dock = DockStyle.Fill;
+			panelSignalBars.Location = new Point(0, 0);
+			panelSignalBars.Margin = new Padding(0);
+			panelSignalBars.Name = "panelSignalBars";
+			panelSignalBars.Size = new Size(79, 42);
+			panelSignalBars.TabIndex = 1;
+			// 
 			// Form1
 			// 
 			AutoScaleMode = AutoScaleMode.None;
@@ -1614,7 +1615,6 @@
 			topMetricsLayout.ResumeLayout(false);
 			panelMetricTgt.ResumeLayout(false);
 			panelMetricFast.ResumeLayout(false);
-			panelMetricPatrol.ResumeLayout(false);
 			panelTalkRadio.ResumeLayout(false);
 			talkButtonsLayout.ResumeLayout(false);
 			panelAlertStatus.ResumeLayout(false);
@@ -1675,10 +1675,6 @@
 		private Label labelFastTitle;
 		private Label labelFastValue;
 		private Label labelFastFooter;
-		private Panel panelMetricPatrol;
-		private Label labelPatrolTitle;
-		private Label labelPatrolValue;
-		private Label labelPatrolFooter;
 		private Panel panelTalkRadio;
 		private Label labelTalkRadio;
 		private Label labelRadioChannel;
@@ -1691,7 +1687,6 @@
 		private Panel panelCadMessage;
 		private Label labelCadMessage;
 		private Panel panelCamera;
-		private Label labelCameraModes;
 		private TableLayoutPanel cameraButtonsLayout;
 		private Button btnRec;
 		private Button btnStop;
@@ -1722,7 +1717,7 @@
 		private TableLayoutPanel radioColumnLayout;
 		private Panel panelRadioDetails;
 		private Label labelRadioHeader;
-		private Label labelRadioInfo;
+      private TableLayoutPanel radioMeterLayout;
 		private Panel panelSignalBars;
 		private Label labelTxRx;
 		private Panel panelProximity;
@@ -1781,5 +1776,10 @@
 		private Label labelCadPlaceholder;
 		private TabPage tabPageCamera;
 		private Label labelCameraPlaceholder;
+		private Label label5;
+		private Label label4;
+		private Label label3;
+		private Label label2;
+		private Label label1;
 	}
 }
