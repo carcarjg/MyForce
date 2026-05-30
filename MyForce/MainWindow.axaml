@@ -8,11 +8,7 @@
         mc:Ignorable="d"
         d:DesignWidth="1366"
         d:DesignHeight="768"
-        Width="1366"
-        Height="768"
-        MinWidth="1366"
-        MinHeight="768"
-        CanResize="False"
+        WindowState="Maximized"
         SystemDecorations="None"
         WindowStartupLocation="CenterScreen"
         Background="#2D090B"
@@ -67,13 +63,17 @@
     </Window.Styles>
 
     <Grid Background="{StaticResource ShellBrush}">
-        <Grid Width="1280"
-              Height="760"
-              HorizontalAlignment="Center"
-              VerticalAlignment="Center"
-              Margin="0"
-              ColumnDefinitions="304,948"
-              ColumnSpacing="10">
+        <Viewbox Stretch="Uniform"
+                 StretchDirection="DownOnly"
+                 HorizontalAlignment="Center"
+                 VerticalAlignment="Center">
+            <Grid Width="1280"
+                  Height="760"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  Margin="0"
+                  ColumnDefinitions="304,948"
+                  ColumnSpacing="10">
             <Grid Grid.Column="0"
                   Width="304"
                   Height="748"
@@ -601,6 +601,7 @@
                     </Grid>
                 </Grid>
             </Border>
-        </Grid>
+            </Grid>
+        </Viewbox>
     </Grid>
 </Window>
