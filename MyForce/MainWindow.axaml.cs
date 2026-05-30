@@ -1,12 +1,13 @@
 using Avalonia.Controls;
+using MyForce.ViewModels;
 
-namespace MyForce
+namespace MyForce;
+
+public partial class MainWindow : Window
 {
-	public partial class MainWindow : Window
+	public MainWindow()
 	{
-		public MainWindow()
-		{
-			InitializeComponent();
-		}
+		InitializeComponent();
+		DataContext = new MainWindowViewModel();
 	}
 }

@@ -538,3 +538,4 @@ google-services.json
 *.db
 *.db-shm
 *.db-wal
+PROJECT_FRAMEWORK.md
