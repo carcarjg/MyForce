@@ -1,4 +1,7 @@
 <Solution>
   <Project Path="MyForce/MyForce.csproj" />
   <Project Path="MyForceUIMockUp/MyForceUIMockUp.csproj" Id="e052d1d2-1503-48ac-ba86-517fe8575299" />
+  <Project Path="MyForce_Audio_Processor/MyForce_Audio_Processor.csproj" Id="b3fe1804-14a7-4e1d-b02c-08e82614d16a" />
+  <Project Path="MyForce_GPIO_Controller/MyForce_GPIO_Controller.csproj" Id="03216f1a-d071-43fb-8ac4-93d8353e8ff3" />
+  <Project Path="MyForce_Siren_Interface/MyForce_Siren_Interface.csproj" Id="ed373d49-ebd3-4a79-9354-1ada75e8f372" />
 </Solution>

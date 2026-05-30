@@ -77,7 +77,7 @@
             <Grid Grid.Column="0"
                   Width="304"
                   Height="748"
-                  RowDefinitions="87,180,152,65,120,88"
+                  RowDefinitions="87,180,116,101,120,88"
                   RowSpacing="10">
                 <Border Grid.Row="0" Classes="panel" Width="304" Height="87" Padding="8">
                     <Grid ColumnDefinitions="89,176" ColumnSpacing="9" HorizontalAlignment="Center">
@@ -169,16 +169,16 @@
                     </Grid>
                 </Border>
 
-                <Border Grid.Row="2" Classes="panel" Width="304" Height="154" Padding="12">
+                <Border Grid.Row="2" Classes="panel" Width="304" Height="126" Padding="12">
                     <TextBlock Classes="white"
                                Width="278"
-                               Height="126"
+                               Height="125"
                                FontSize="18"
                                TextWrapping="Wrap"
                                Text="{Binding AlertStatus}" />
                 </Border>
 
-                <Border Grid.Row="3" Classes="panel" Width="304" Height="65" Padding="12,10">
+                <Border Grid.Row="3" Classes="panel" Width="304" Height="100" Padding="12,10">
                     <TextBlock Classes="white"
                                Width="278"
                                Height="43"
@@ -188,7 +188,7 @@
                                Text="{Binding CadMessage}" />
                 </Border>
 
-                <Border Grid.Row="4" Classes="panel" Width="304" Height="120" Padding="12">
+                <Border Grid.Row="4" Classes="panel" Width="304" Height="130" Padding="12">
                     <Grid Width="278"
                           Height="99"
                           ColumnDefinitions="86,86,88"
@@ -232,11 +232,15 @@
                                        Height="34"
                                        FontSize="28"
                                        VerticalAlignment="Center"
+                                       HorizontalAlignment="Center"
                                        Text="{Binding Clock}" />
                             <TextBlock Classes="white"
                                        Width="128"
                                        Height="23"
                                        FontSize="15"
+                                       VerticalAlignment="Center"
+                                       HorizontalAlignment="Center"
+                                       Padding="8,0"
                                        Text="{Binding Date}" />
                         </StackPanel>
 
@@ -501,13 +505,18 @@
                                                        TextAlignment="Center"
                                                        Text="L / S" />
                                             <Border Grid.Row="1" Classes="buttonFrame" Width="157" Height="130">
-                                                <TextBlock Classes="white"
-                                                           Width="157"
-                                                           Height="130"
-                                                           FontSize="50"
-                                                           TextAlignment="Center"
-                                                           VerticalAlignment="Center"
-                                                           Text="L / S&#x0a;OFF" />
+                                                <Grid>
+                                                    <Viewbox Stretch="Uniform"
+                                                             HorizontalAlignment="Center"
+                                                             VerticalAlignment="Center"
+                                                             MaxWidth="130"
+                                                             MaxHeight="104">
+                                                        <TextBlock Classes="white"
+                                                                   TextAlignment="Center"
+                                                                   VerticalAlignment="Center"
+                                                                   Text="L / S&#x0a;OFF" />
+                                                    </Viewbox>
+                                                </Grid>
                                             </Border>
                                         </Grid>
                                     </Border>
@@ -521,13 +530,18 @@
                                                        TextAlignment="Center"
                                                        Text="EXT AUDIO" />
                                             <Border Grid.Row="1" Classes="buttonFrame" Width="157" Height="139">
-                                                <TextBlock Classes="white"
-                                                           Width="157"
-                                                           Height="139"
-                                                           FontSize="50"
-                                                           TextAlignment="Center"
-                                                           VerticalAlignment="Center"
-                                                           Text="OFF" />
+                                                <Grid>
+                                                    <Viewbox Stretch="Uniform"
+                                                             HorizontalAlignment="Center"
+                                                             VerticalAlignment="Center"
+                                                             MaxWidth="120"
+                                                             MaxHeight="110">
+                                                        <TextBlock Classes="white"
+                                                                   TextAlignment="Center"
+                                                                   VerticalAlignment="Center"
+                                                                   Text="OFF" />
+                                                    </Viewbox>
+                                                </Grid>
                                             </Border>
                                         </Grid>
                                     </Border>
@@ -542,15 +556,18 @@
                                                    TextAlignment="Center"
                                                    Text="MEMO" />
                                         <Border Grid.Row="1" Classes="buttonFrame" Width="165" Height="133">
-                                            <Viewbox Stretch="Fill">
-                                                <TextBlock Classes="white"
-                                                           TextAlignment="Center"
-                                                           Width="157"
-                                                           Height="139"
-                                                           FontSize="50"
-                                                           VerticalAlignment="Center"
-                                                           Text="REC" />
-                                            </Viewbox>
+                                            <Grid>
+                                                <Viewbox Stretch="Uniform"
+                                                         HorizontalAlignment="Center"
+                                                         VerticalAlignment="Center"
+                                                         MaxWidth="120"
+                                                         MaxHeight="90">
+                                                    <TextBlock Classes="white"
+                                                               TextAlignment="Center"
+                                                               VerticalAlignment="Center"
+                                                               Text="REC" />
+                                                </Viewbox>
+                                            </Grid>
                                         </Border>
                                     </Grid>
                                 </Border>
@@ -564,15 +581,18 @@
                                                    TextAlignment="Center"
                                                    Text="AM / FM" />
                                         <Border Grid.Row="1" Classes="buttonFrame" Width="168" Height="130">
-                                            <Viewbox Stretch="Fill">
-                                                <TextBlock Classes="white"
-                                                           TextAlignment="Center"
-                                                           Width="157"
-                                                           Height="139"
-                                                           FontSize="50"
-                                                           VerticalAlignment="Center"
-                                                           Text="MUTE" />
-                                            </Viewbox>
+                                            <Grid>
+                                                <Viewbox Stretch="Uniform"
+                                                         HorizontalAlignment="Center"
+                                                         VerticalAlignment="Center"
+                                                         MaxWidth="128"
+                                                         MaxHeight="92">
+                                                    <TextBlock Classes="white"
+                                                               TextAlignment="Center"
+                                                               VerticalAlignment="Center"
+                                                               Text="MUTE" />
+                                                </Viewbox>
+                                            </Grid>
                                         </Border>
                                     </Grid>
                                 </Border>
