@@ -982,6 +982,7 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
     private LinuxPlayerLaunch? TryStartLinuxPlayer(string streamUrl)
     {
         var candidate = LinuxPlayerCandidate.CreateFfplay(GetLinuxPlayerVolumePercent(), streamUrl);
+        Console.WriteLine($"[audio-processor] Launching Linux internet radio player: {candidate.StartInfo.FileName} {string.Join(' ', candidate.StartInfo.ArgumentList)}");
         var process = new Process
         {
             StartInfo = candidate.StartInfo
@@ -1145,7 +1146,6 @@ internal sealed class LinuxPlayerCandidate
         var startInfo = CreateStartInfo("ffplay");
         startInfo.ArgumentList.Add("-nodisp");
         startInfo.ArgumentList.Add("-vn");
-        startInfo.ArgumentList.Add("-nostdin");
         startInfo.ArgumentList.Add("-hide_banner");
         startInfo.ArgumentList.Add("-loglevel");
         startInfo.ArgumentList.Add("error");
