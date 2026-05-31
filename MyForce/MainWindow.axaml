@@ -127,13 +127,13 @@
                                    Height="35"
                                    FontSize="18"
                                    VerticalAlignment="Center"
-                                   Text="{Binding TalkRadio}" />
+                                   Text="{Binding CurrentTalkRadio, StringFormat='TALK RADIO: {0}'}" />
                         <TextBlock Grid.Row="1"
                                    Classes="white"
                                    Height="29"
                                    FontSize="18"
                                    VerticalAlignment="Center"
-                                   Text="{Binding RadioChannel}" />
+                                   Text="{Binding CurrentRadioChannel, StringFormat='RADIO CH: {0}'}" />
                         <Grid Grid.Row="2"
                               Width="278"
                               Height="87"
@@ -170,22 +170,62 @@
                 </Border>
 
                 <Border Grid.Row="2" Classes="panel" Width="304" Height="126" Padding="12">
-                    <TextBlock Classes="white"
-                               Width="278"
-                               Height="125"
-                               FontSize="18"
-                               TextWrapping="Wrap"
-                               Text="{Binding AlertStatus}" />
+                    <StackPanel Width="278" Height="125" Spacing="0">
+                        <TextBlock Classes="white"
+                                   Height="31"
+                                   FontSize="18"
+                                   Text="{Binding AlertLightSiren, StringFormat='ALERT L/S :  {0}'}" />
+                        <TextBlock Classes="white"
+                                   Height="31"
+                                   FontSize="18"
+                                   Text="{Binding DirectionalStatus, StringFormat='DIRECTIONAL :  {0}'}" />
+                        <TextBlock Classes="white"
+                                   Height="31"
+                                   FontSize="18"
+                                   Text="SCENE :  LA / TD / RA" />
+                        <TextBlock Classes="white"
+                                   Height="31"
+                                   FontSize="18"
+                                   Text="{Binding SirenStatus, StringFormat='SIREN :  {0}'}" />
+                    </StackPanel>
                 </Border>
 
                 <Border Grid.Row="3" Classes="panel" Width="304" Height="100" Padding="12,10">
-                    <TextBlock Classes="white"
-                               Width="278"
-                               Height="43"
-                               FontSize="13"
-                               TextAlignment="Center"
-                               VerticalAlignment="Center"
-                               Text="{Binding CadMessage}" />
+                    <Grid Width="278"
+                          Height="78"
+                          RowDefinitions="24,18,18,18"
+                          RowSpacing="0"
+                          VerticalAlignment="Center">
+                        <TextBlock Classes="white"
+                                   Width="278"
+                                   Height="24"
+                                   FontSize="13"
+                                   TextAlignment="Center"
+                                   Text="{Binding CadMessage}" />
+                        <TextBlock Grid.Row="1"
+                                   Classes="white"
+                                   Width="278"
+                                   Height="18"
+                                   FontSize="12"
+                                   TextAlignment="Center"
+                                   Text="{Binding MqttStatus, StringFormat='MQTT: {0}'}" />
+                        <TextBlock Grid.Row="2"
+                                   Width="278"
+                                   Height="18"
+                                   Foreground="{StaticResource SignalBrush}"
+                                   FontFamily="Segoe UI"
+                                   FontWeight="Bold"
+                                   FontSize="12"
+                                   TextAlignment="Center"
+                                   Text="{Binding MqttEndpoint}" />
+                        <TextBlock Grid.Row="3"
+                                   Classes="white"
+                                   Width="278"
+                                   Height="18"
+                                   FontSize="11"
+                                   TextAlignment="Center"
+                                   Text="{Binding MqttDetail}" />
+                    </Grid>
                 </Border>
 
                 <Border Grid.Row="4" Classes="panel" Width="304" Height="130" Padding="12">
@@ -258,7 +298,7 @@
                                        FontWeight="Bold"
                                        FontSize="28"
                                        TextAlignment="Center"
-                                       Text="{Binding Volume}" />
+                                       Text="{Binding CurrentTalkRadioVolume}" />
                         </StackPanel>
 
                         <Border Grid.Column="2"
@@ -345,12 +385,12 @@
                                   RowSpacing="10">
                                 <Border Grid.Row="0" Classes="panel" Width="304" Height="223" Padding="10">
                                     <StackPanel Width="282" Height="204" Spacing="0">
-                                        <TextBlock Classes="white" Width="282" Height="34" FontSize="18" Text="RADIO 1: CT OPS 800" />
-                                        <TextBlock Classes="white" Width="282" Height="34" FontSize="18" Text="RADIO 2: CT OPS V" />
-                                        <TextBlock Classes="white" Width="282" Height="34" FontSize="18" Text="RADIO 3: TXT MAIN" />
-                                        <TextBlock Classes="white" Width="282" Height="34" FontSize="18" Text="RADIO 4: CT ALE M" />
-                                        <TextBlock Classes="white" Width="282" Height="34" FontSize="18" Text="RADIO 5: $CMD_1" />
-                                        <TextBlock Classes="white" Width="282" Height="34" FontSize="18" Text="RADIO 6: ABIA TWR" />
+                                        <TextBlock Classes="white" Width="282" Height="34" FontSize="18" Text="{Binding Radio1ChannelName, StringFormat='RADIO 1: {0}'}" />
+                                        <TextBlock Classes="white" Width="282" Height="34" FontSize="18" Text="{Binding Radio2ChannelName, StringFormat='RADIO 2: {0}'}" />
+                                        <TextBlock Classes="white" Width="282" Height="34" FontSize="18" Text="{Binding Radio3ChannelName, StringFormat='RADIO 3: {0}'}" />
+                                        <TextBlock Classes="white" Width="282" Height="34" FontSize="18" Text="{Binding Radio4ChannelName, StringFormat='RADIO 4: {0}'}" />
+                                        <TextBlock Classes="white" Width="282" Height="34" FontSize="18" Text="{Binding Radio5ChannelName, StringFormat='RADIO 5: {0}'}" />
+                                        <TextBlock Classes="white" Width="282" Height="34" FontSize="18" Text="{Binding Radio6ChannelName, StringFormat='RADIO 6: {0}'}" />
                                     </StackPanel>
                                 </Border>
 
@@ -371,22 +411,22 @@
                                               RowSpacing="6">
                                             <Border Grid.Row="0" Grid.Column="0" Classes="buttonFrame" Width="135" Height="86">
                                                 <Viewbox Stretch="Uniform">
-                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" FontSize="1" Text="CT OPS 800" />
+                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" FontSize="1" Text="{Binding ProximityChannel1}" />
                                                 </Viewbox>
                                             </Border>
                                             <Border Grid.Row="0" Grid.Column="1" Classes="buttonFrame" Width="135" Height="86">
                                                 <Viewbox Stretch="Uniform">
-                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" FontSize="1" Text="DFW TAC1" />
+                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" FontSize="1" Text="{Binding ProximityChannel2}" />
                                                 </Viewbox>
                                             </Border>
                                             <Border Grid.Row="1" Grid.Column="0" Classes="buttonFrame" Width="135" Height="86">
                                                 <Viewbox Stretch="Uniform">
-                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" FontSize="1" Text="$CMD_1" />
+                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" FontSize="1" Text="{Binding ProximityChannel3}" />
                                                 </Viewbox>
                                             </Border>
                                             <Border Grid.Row="1" Grid.Column="1" Classes="buttonFrame" Width="135" Height="86">
                                                 <Viewbox Stretch="Uniform">
-                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" FontSize="1" Text="DFW_TWR_E" />
+                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" FontSize="1" Text="{Binding ProximityChannel4}" />
                                                 </Viewbox>
                                             </Border>
                                         </Grid>

@@ -1,3 +1,20 @@
+// %%%%%%    @%%%%%@
+//%%%%%%%%   %%%%%%%@
+//@%%%%%%%@  %%%%%%%%%        @@      @@  @@@      @@@ @@@     @@@ @@@@@@@@@@   @@@@@@@@@
+//%%%%%%%%@ @%%%%%%%%       @@@@@   @@@@ @@@@@   @@@@ @@@@   @@@@ @@@@@@@@@@@@@@@@@@@@@@@ @@@@
+// @%%%%%%%%  %%%%%%%%%      @@@@@@  @@@@  @@@@  @@@@   @@@@@@@@@     @@@@    @@@@         @@@@
+//  %%%%%%%%%  %%%%%%%%@     @@@@@@@ @@@@   @@@@@@@@     @@@@@@       @@@@    @@@@@@@@@@@  @@@@
+//   %%%%%%%%@  %%%%%%%%%    @@@@@@@@@@@@     @@@@        @@@@@       @@@@    @@@@@@@@@@@  @@@@
+//    %%%%%%%%@ @%%%%%%%%    @@@@ @@@@@@@     @@@@      @@@@@@@@      @@@@    @@@@         @@@@
+//    @%%%%%%%%% @%%%%%%%%   @@@@   @@@@@     @@@@     @@@@@ @@@@@    @@@@    @@@@@@@@@@@@ @@@@@@@@@@
+//     @%%%%%%%%  %%%%%%%%@  @@@@    @@@@     @@@@    @@@@     @@@@   @@@@    @@@@@@@@@@@@ @@@@@@@@@@@
+//      %%%%%%%%@ @%%%%%%%%
+//      @%%%%%%%%  @%%%%%%%%
+//       %%%%%%%%   %%%%%%%@
+//         %%%%%      %%%%
+//
+// Copyright (C) 2025-2026 NyxTel Wireless / Nyx Gallini
+//
 using System;
 using Avalonia;
 using Avalonia.Controls;
@@ -9,12 +26,12 @@ namespace MyForce;
 
 public partial class MainWindow : Window
 {
- private readonly MainWindowViewModel _viewModel;
+	private readonly MainWindowViewModel _viewModel;
 
 	public MainWindow()
 	{
 		InitializeComponent();
-        _viewModel = new MainWindowViewModel();
+		_viewModel = new MainWindowViewModel();
 		DataContext = _viewModel;
 	}
 
