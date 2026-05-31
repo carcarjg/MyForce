@@ -62,6 +62,14 @@
             <Setter Property="FontFamily" Value="Segoe UI" />
             <Setter Property="FontWeight" Value="Bold" />
         </Style>
+
+        <Style Selector="Expander.adminMenu">
+            <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
+            <Setter Property="Background" Value="#161616" />
+            <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="12" />
+        </Style>
     </Window.Styles>
 
     <Grid Background="{StaticResource ShellBrush}">
@@ -81,7 +89,7 @@
                   RowSpacing="10">
                 <Border Grid.Row="0" Classes="panel" Width="304" Height="87" Padding="8">
                     <Grid ColumnDefinitions="89,176" ColumnSpacing="9" HorizontalAlignment="Center">
-                        <StackPanel Width="89" Height="63" Spacing="0" HorizontalAlignment="Center">
+                        <StackPanel Width="89" Height="63" Spacing="0" HorizontalAlignment="Center" PointerPressed="OnSpeedPressed">
                             <TextBlock Classes="white"
                                        Width="89"
                                        Height="24"
@@ -845,5 +853,122 @@
             </Border>
             </Grid>
         </Viewbox>
+
+        <Border IsVisible="{Binding IsAdminOverlayVisible}"
+                Background="#F20B0B0B"
+                BorderBrush="{StaticResource PanelBorderBrush}"
+                BorderThickness="2"
+                Padding="16"
+                ZIndex="100">
+            <Grid ColumnDefinitions="320,*"
+                  ColumnSpacing="16">
+                <Border Classes="panel"
+                        Grid.Column="0"
+                        Padding="12">
+                    <Grid RowDefinitions="Auto,*,Auto"
+                          RowSpacing="12">
+                        <TextBlock Classes="white"
+                                   FontSize="26"
+                                   Text="ADMIN" />
+
+                        <ScrollViewer Grid.Row="1"
+                                      VerticalScrollBarVisibility="Auto">
+                            <StackPanel Spacing="10">
+                                <Expander Classes="adminMenu" Header="SYSTEM" IsExpanded="True">
+                                    <StackPanel Spacing="8">
+                                        <Border Classes="buttonFrame" PointerPressed="OnAdminSystemPressed" Padding="10">
+                                            <TextBlock Classes="white" Text="General" />
+                                        </Border>
+                                    </StackPanel>
+                                </Expander>
+
+                                <Expander Classes="adminMenu" Header="AUDIO">
+                                    <StackPanel Spacing="8">
+                                        <Border Classes="buttonFrame" PointerPressed="OnAdminAudioPressed" Padding="10">
+                                            <TextBlock Classes="white" Text="Routing / Devices" />
+                                        </Border>
+                                    </StackPanel>
+                                </Expander>
+
+                                <Expander Classes="adminMenu" Header="RADIO">
+                                    <StackPanel Spacing="8">
+                                        <Border Classes="buttonFrame" PointerPressed="OnAdminRadioPressed" Padding="10">
+                                            <TextBlock Classes="white" Text="Resources / Channels" />
+                                        </Border>
+                                    </StackPanel>
+                                </Expander>
+
+                                <Expander Classes="adminMenu" Header="NETWORK">
+                                    <StackPanel Spacing="8">
+                                        <Border Classes="buttonFrame" PointerPressed="OnAdminNetworkPressed" Padding="10">
+                                            <TextBlock Classes="white" Text="MQTT / LAN" />
+                                        </Border>
+                                    </StackPanel>
+                                </Expander>
+
+                                <Expander Classes="adminMenu" Header="SECURITY">
+                                    <StackPanel Spacing="8">
+                                        <Border Classes="buttonFrame" PointerPressed="OnAdminSecurityPressed" Padding="10">
+                                            <TextBlock Classes="white" Text="Users / Roles" />
+                                        </Border>
+                                    </StackPanel>
+                                </Expander>
+
+                                <Expander Classes="adminMenu" Header="INTEGRATIONS">
+                                    <StackPanel Spacing="8">
+                                        <Border Classes="buttonFrame" PointerPressed="OnAdminIntegrationsPressed" Padding="10">
+                                            <TextBlock Classes="white" Text="CAD / Siren / SCADA" />
+                                        </Border>
+                                    </StackPanel>
+                                </Expander>
+
+                                <Expander Classes="adminMenu" Header="DIAGNOSTICS">
+                                    <StackPanel Spacing="8">
+                                        <Border Classes="buttonFrame" PointerPressed="OnAdminDiagnosticsPressed" Padding="10">
+                                            <TextBlock Classes="white" Text="Health / Logs" />
+                                        </Border>
+                                    </StackPanel>
+                                </Expander>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <Border Grid.Row="2"
+                                Classes="buttonFrame"
+                                PointerPressed="OnCloseAdminPressed"
+                                Padding="12">
+                            <TextBlock Classes="white"
+                                       FontSize="18"
+                                       TextAlignment="Center"
+                                       Text="CLOSE ADMIN" />
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="1"
+                        Classes="panel"
+                        Padding="20">
+                    <Grid RowDefinitions="Auto,Auto,*"
+                          RowSpacing="16">
+                        <TextBlock Classes="white"
+                                   FontSize="30"
+                                   Text="{Binding AdminSectionTitle}" />
+                        <TextBlock Grid.Row="1"
+                                   Classes="white"
+                                   FontSize="18"
+                                   TextWrapping="Wrap"
+                                   Text="{Binding AdminSectionDescription}" />
+                        <Border Grid.Row="2"
+                                Classes="panel"
+                                Padding="20">
+                            <TextBlock Classes="white"
+                                       FontSize="22"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center"
+                                       Text="Configuration editor placeholder. The selected admin category will render here full screen." />
+                        </Border>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

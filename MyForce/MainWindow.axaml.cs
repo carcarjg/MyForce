@@ -15,6 +15,8 @@
 //
 // Copyright (C) 2025-2026 NyxTel Wireless / Nyx Gallini
 //
+using System;
+using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -25,7 +27,13 @@ namespace MyForce;
 
 public partial class MainWindow : Window
 {
+	private const int AdminTapThreshold = 5;
+
+	private static readonly TimeSpan AdminTapWindow = TimeSpan.FromSeconds(20);
+
 	private readonly MainWindowViewModel _viewModel;
+
+	private readonly Queue<DateTime> _speedTapTimes = new();
 
 	public MainWindow()
 	{
@@ -42,6 +50,25 @@ public partial class MainWindow : Window
 
 	private void OnChannelUpPressed(object? sender, PointerPressedEventArgs e)
 	{ }
+
+	private void OnSpeedPressed(object? sender, PointerPressedEventArgs e)
+	{
+		DateTime now = DateTime.UtcNow;
+		_speedTapTimes.Enqueue(now);
+
+		while (_speedTapTimes.Count > 0 && now - _speedTapTimes.Peek() > AdminTapWindow)
+		{
+			_ = _speedTapTimes.Dequeue();
+		}
+
+		if (_speedTapTimes.Count < AdminTapThreshold)
+		{
+			return;
+		}
+
+		_speedTapTimes.Clear();
+		_viewModel.OpenAdminOverlay();
+	}
 
 	private void OnChannelDownPressed(object? sender, PointerPressedEventArgs e)
 	{ }
@@ -150,8 +177,54 @@ public partial class MainWindow : Window
 	private void OnAmFmMutePressed(object? sender, PointerPressedEventArgs e)
 	{ }
 
+	private void OnCloseAdminPressed(object? sender, PointerPressedEventArgs e)
+	{
+		_speedTapTimes.Clear();
+		_viewModel.CloseAdminOverlay();
+	}
+
+	private void OnAdminSystemPressed(object? sender, PointerPressedEventArgs e)
+	{
+		SelectAdminSection(AdminSection.System);
+	}
+
+	private void OnAdminAudioPressed(object? sender, PointerPressedEventArgs e)
+	{
+		SelectAdminSection(AdminSection.Audio);
+	}
+
+	private void OnAdminRadioPressed(object? sender, PointerPressedEventArgs e)
+	{
+		SelectAdminSection(AdminSection.Radio);
+	}
+
+	private void OnAdminNetworkPressed(object? sender, PointerPressedEventArgs e)
+	{
+		SelectAdminSection(AdminSection.Network);
+	}
+
+	private void OnAdminSecurityPressed(object? sender, PointerPressedEventArgs e)
+	{
+		SelectAdminSection(AdminSection.Security);
+	}
+
+	private void OnAdminIntegrationsPressed(object? sender, PointerPressedEventArgs e)
+	{
+		SelectAdminSection(AdminSection.Integrations);
+	}
+
+	private void OnAdminDiagnosticsPressed(object? sender, PointerPressedEventArgs e)
+	{
+		SelectAdminSection(AdminSection.Diagnostics);
+	}
+
 	private void SelectTab(MainConsoleTab tab)
 	{
 		_viewModel.SelectTab(tab);
+	}
+
+	private void SelectAdminSection(AdminSection section)
+	{
+		_viewModel.SelectAdminSection(section);
 	}
 }

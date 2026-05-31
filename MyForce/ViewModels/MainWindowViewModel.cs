@@ -37,6 +37,17 @@ public enum MainConsoleTab
 	Camera,
 }
 
+public enum AdminSection
+{
+	System,
+	Audio,
+	Radio,
+	Network,
+	Security,
+	Integrations,
+	Diagnostics,
+}
+
 public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 {
 	private readonly DispatcherTimer _clockTimer;
@@ -86,6 +97,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 	private string _mqttDetail = "Broker not connected.";
 
 	private MainConsoleTab _selectedTab = MainConsoleTab.Patrol;
+
+	private bool _isAdminOverlayVisible;
+
+	private AdminSection _selectedAdminSection = AdminSection.System;
+
+	private string _adminSectionTitle = "SYSTEM";
+
+	private string _adminSectionDescription = "Core console configuration and startup settings will live here.";
 
 	public string _CurSelChExt1;
 
@@ -300,9 +319,82 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	public bool IsCameraContentVisible => IsCameraTabSelected;
 
+	public bool IsAdminOverlayVisible
+	{
+		get => _isAdminOverlayVisible;
+		private set => SetProperty(ref _isAdminOverlayVisible, value);
+	}
+
+	public AdminSection SelectedAdminSection
+	{
+		get => _selectedAdminSection;
+		private set => SetProperty(ref _selectedAdminSection, value);
+	}
+
+	public string AdminSectionTitle
+	{
+		get => _adminSectionTitle;
+		private set => SetProperty(ref _adminSectionTitle, value);
+	}
+
+	public string AdminSectionDescription
+	{
+		get => _adminSectionDescription;
+		private set => SetProperty(ref _adminSectionDescription, value);
+	}
+
 	public void SelectTab(MainConsoleTab tab)
 	{
 		SelectedTab = tab;
+	}
+
+	public void OpenAdminOverlay()
+	{
+		IsAdminOverlayVisible = true;
+	}
+
+	public void CloseAdminOverlay()
+	{
+		IsAdminOverlayVisible = false;
+	}
+
+	public void SelectAdminSection(AdminSection section)
+	{
+		SelectedAdminSection = section;
+
+		switch (section)
+		{
+			case AdminSection.System:
+				AdminSectionTitle = "SYSTEM";
+				AdminSectionDescription = "Core console configuration and startup settings will live here.";
+				break;
+			case AdminSection.Audio:
+				AdminSectionTitle = "AUDIO";
+				AdminSectionDescription = "Audio routing, gain staging, and operator device settings will live here.";
+				break;
+			case AdminSection.Radio:
+				AdminSectionTitle = "RADIO";
+				AdminSectionDescription = "Radio resources, channels, and talk group configuration will live here.";
+				break;
+			case AdminSection.Network:
+				AdminSectionTitle = "NETWORK";
+				AdminSectionDescription = "MQTT, LAN, broker, and remote endpoint configuration will live here.";
+				break;
+			case AdminSection.Security:
+				AdminSectionTitle = "SECURITY";
+				AdminSectionDescription = "Authentication, roles, and system access configuration will live here.";
+				break;
+			case AdminSection.Integrations:
+				AdminSectionTitle = "INTEGRATIONS";
+				AdminSectionDescription = "CAD, siren, SCADA, and other external integration settings will live here.";
+				break;
+			case AdminSection.Diagnostics:
+				AdminSectionTitle = "DIAGNOSTICS";
+				AdminSectionDescription = "Health, logging, and diagnostics configuration will live here.";
+				break;
+			default:
+				throw new ArgumentOutOfRangeException(nameof(section), section, null);
+		}
 	}
 
 	public void Dispose()
