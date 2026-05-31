@@ -3,6 +3,13 @@ using MQTTnet.Formatter;
 using System.Text.Json;
 using Config.Net;
 
+using var instanceLock = SingleInstanceLock.TryAcquire("myforce-siren-interface");
+if (instanceLock is null)
+{
+    Console.WriteLine("[siren-interface] Another Siren Interface instance is already running. Exiting to avoid MQTT client id takeover.");
+    return;
+}
+
 var sirenInterface = new SirenInterfaceMqttApp();
 await sirenInterface.RunAsync();
 
@@ -286,7 +293,7 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
 
     private Task OnDisconnectedAsync(MqttClientDisconnectedEventArgs arg)
     {
-        var detail = arg.Exception?.Message ?? arg.ReasonString ?? "Disconnected.";
+        var detail = DescribeDisconnect(arg.Exception?.Message ?? arg.ReasonString ?? "Disconnected.");
         Console.WriteLine($"[{_serviceName}] MQTT disconnected from {GetEndpointLabel()}: {detail}");
         StartReconnectLoop();
         return Task.CompletedTask;
@@ -386,6 +393,54 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
     private string GetTransportLabel()
     {
         return _options.UseTls ? "encrypted MQTT" : "unencrypted MQTT";
+    }
+
+    private string DescribeDisconnect(string detail)
+    {
+        if (detail.Contains("SessionTakenOver", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{detail} Another connection is using MQTT client id '{_options.ClientId}'. Ensure only one Siren Interface instance is running.";
+        }
+
+        return detail;
+    }
+}
+
+internal sealed class SingleInstanceLock : IDisposable
+{
+    private readonly Mutex _mutex;
+
+    private SingleInstanceLock(Mutex mutex)
+    {
+        _mutex = mutex;
+    }
+
+    public static SingleInstanceLock? TryAcquire(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        var mutex = new Mutex(initiallyOwned: false, $"Global\\{name}");
+
+        try
+        {
+            if (!mutex.WaitOne(TimeSpan.Zero, exitContext: false))
+            {
+                mutex.Dispose();
+                return null;
+            }
+
+            return new SingleInstanceLock(mutex);
+        }
+        catch (AbandonedMutexException)
+        {
+            return new SingleInstanceLock(mutex);
+        }
+    }
+
+    public void Dispose()
+    {
+        _mutex.ReleaseMutex();
+        _mutex.Dispose();
     }
 }
 

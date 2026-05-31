@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Net.Http;
 using System.Text.Json;
 using MQTTnet;
@@ -822,13 +823,17 @@ internal static class AudioProcessorJson
 internal sealed class InternetRadioPlaybackController : IAsyncDisposable
 {
     private readonly HttpClient _httpClient;
+    private Process? _externalPlayerProcess;
     private IWavePlayer? _waveOut;
     private MediaFoundationReader? _reader;
+    private InternetRadioPlayCommand? _activeCommand;
+    private string? _activeBackend;
     private decimal _outputGain = 1.0m;
 
     public InternetRadioPlaybackController()
     {
         _httpClient = new HttpClient();
+        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("MyForce-AudioProcessor/1.0");
         CurrentState = new InternetRadioPlaybackState(false, null, null, null, null, "IDLE", "No internet radio stream selected.");
     }
 
@@ -843,17 +848,24 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(command.StreamUrl);
         ArgumentException.ThrowIfNullOrWhiteSpace(command.DisplayName);
 
-        using var request = new HttpRequestMessage(HttpMethod.Head, command.StreamUrl);
-        using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        await EnsureStreamReachableAsync(command.StreamUrl, cancellationToken).ConfigureAwait(false);
 
-        Stop();
+        ReleasePlaybackResources();
 
-        _reader = new MediaFoundationReader(command.StreamUrl);
-        _waveOut = new WaveOutEvent();
-        _waveOut.Init(_reader);
-        ApplyCurrentOutputGain();
-        _waveOut.Play();
+        if (OperatingSystem.IsWindows())
+        {
+            StartWindowsPlayback(command);
+        }
+        else if (OperatingSystem.IsLinux())
+        {
+            StartLinuxPlayback(command);
+        }
+        else
+        {
+            throw new PlatformNotSupportedException("Internet radio playback is currently supported on Windows and Linux only.");
+        }
+
+        _activeCommand = command;
 
         CurrentState = new InternetRadioPlaybackState(
             IsPlaying: true,
@@ -862,7 +874,7 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
             Genre: command.Genre,
             Language: command.Language,
             Status: "PLAYING",
-            Detail: "Internet radio stream playing on the default output.");
+            Detail: $"Internet radio stream playing on {GetPlaybackBackendDescription()}.");
     }
 
     /// <summary>
@@ -870,11 +882,8 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
     /// </summary>
     public void Stop()
     {
-        _waveOut?.Stop();
-        _reader?.Dispose();
-        _waveOut?.Dispose();
-        _reader = null;
-        _waveOut = null;
+        ReleasePlaybackResources();
+        _activeCommand = null;
 
         CurrentState = CurrentState with
         {
@@ -902,12 +911,172 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
 
     private void ApplyCurrentOutputGain()
     {
-        if (_waveOut is null)
+        if (_waveOut is not null)
+        {
+            _waveOut.Volume = (float)Math.Clamp(_outputGain / 2.0m, 0m, 1.0m);
+            return;
+        }
+
+        if (OperatingSystem.IsLinux() && _externalPlayerProcess is not null && _activeCommand is not null)
+        {
+            RestartLinuxPlaybackForVolumeChange();
+        }
+    }
+
+    private async Task EnsureStreamReachableAsync(string streamUrl, CancellationToken cancellationToken)
+    {
+        if (await TryValidateStreamAsync(HttpMethod.Head, streamUrl, cancellationToken).ConfigureAwait(false))
         {
             return;
         }
 
-        _waveOut.Volume = (float)Math.Clamp(_outputGain / 2.0m, 0m, 1.0m);
+        if (await TryValidateStreamAsync(HttpMethod.Get, streamUrl, cancellationToken).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        throw new HttpRequestException($"Unable to open internet radio stream '{streamUrl}'.");
+    }
+
+    private async Task<bool> TryValidateStreamAsync(HttpMethod method, string streamUrl, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(method, streamUrl);
+
+        try
+        {
+            using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            return response.IsSuccessStatusCode;
+        }
+        catch (HttpRequestException)
+        {
+            return false;
+        }
+    }
+
+    private void StartWindowsPlayback(InternetRadioPlayCommand command)
+    {
+        _reader = new MediaFoundationReader(command.StreamUrl);
+        _waveOut = new WaveOutEvent();
+        _waveOut.Init(_reader);
+        _activeBackend = "the Windows default output";
+        ApplyCurrentOutputGain();
+        _waveOut.Play();
+    }
+
+    private void StartLinuxPlayback(InternetRadioPlayCommand command)
+    {
+        var launchedPlayer = TryStartLinuxPlayer(command.StreamUrl);
+        if (launchedPlayer is null)
+        {
+            throw new PlatformNotSupportedException("Linux internet radio playback requires ffplay to be installed and available on PATH.");
+        }
+
+        _externalPlayerProcess = launchedPlayer.Process;
+        _activeBackend = launchedPlayer.BackendLabel;
+    }
+
+    private LinuxPlayerLaunch? TryStartLinuxPlayer(string streamUrl)
+    {
+        var candidate = LinuxPlayerCandidate.CreateFfplay(GetLinuxPlayerVolumePercent(), streamUrl);
+        var process = new Process
+        {
+            StartInfo = candidate.StartInfo
+        };
+
+        try
+        {
+            if (!process.Start())
+            {
+                process.Dispose();
+                return null;
+            }
+
+            if (process.WaitForExit(250))
+            {
+                process.Dispose();
+                return null;
+            }
+
+            return new LinuxPlayerLaunch(process, candidate.BackendLabel);
+        }
+        catch (InvalidOperationException)
+        {
+            process.Dispose();
+            return null;
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            process.Dispose();
+            return null;
+        }
+    }
+
+    private void RestartLinuxPlaybackForVolumeChange()
+    {
+        var activeCommand = _activeCommand;
+        if (activeCommand is null)
+        {
+            return;
+        }
+
+        try
+        {
+            ReleasePlaybackResources();
+            StartLinuxPlayback(activeCommand);
+            CurrentState = CurrentState with
+            {
+                Detail = $"Internet radio stream playing on {GetPlaybackBackendDescription()}."
+            };
+        }
+        catch (Exception ex)
+        {
+            CurrentState = CurrentState with
+            {
+                Status = "ERROR",
+                Detail = $"Internet radio volume update failed on Linux: {ex.Message}"
+            };
+        }
+    }
+
+    private void ReleasePlaybackResources()
+    {
+        _waveOut?.Stop();
+        _reader?.Dispose();
+        _waveOut?.Dispose();
+        _reader = null;
+        _waveOut = null;
+
+        if (_externalPlayerProcess is not null)
+        {
+            try
+            {
+                if (!_externalPlayerProcess.HasExited)
+                {
+                    _externalPlayerProcess.Kill(entireProcessTree: true);
+                    _externalPlayerProcess.WaitForExit(2000);
+                }
+            }
+            catch (InvalidOperationException)
+            {
+            }
+            finally
+            {
+                _externalPlayerProcess.Dispose();
+                _externalPlayerProcess = null;
+            }
+        }
+
+        _activeBackend = null;
+    }
+
+    private string GetPlaybackBackendDescription()
+    {
+        return _activeBackend ?? "the default output";
+    }
+
+    private int GetLinuxPlayerVolumePercent()
+    {
+        return (int)Math.Round(decimal.Clamp(_outputGain / 2.0m, 0m, 1.0m) * 100m, MidpointRounding.AwayFromZero);
     }
 
     public ValueTask DisposeAsync()
@@ -915,5 +1084,44 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
         Stop();
         _httpClient.Dispose();
         return ValueTask.CompletedTask;
+    }
+}
+
+internal sealed record LinuxPlayerLaunch(Process Process, string BackendLabel);
+
+internal sealed class LinuxPlayerCandidate
+{
+    private LinuxPlayerCandidate(string backendLabel, ProcessStartInfo startInfo)
+    {
+        BackendLabel = backendLabel;
+        StartInfo = startInfo;
+    }
+
+    public string BackendLabel { get; }
+
+    public ProcessStartInfo StartInfo { get; }
+
+    public static LinuxPlayerCandidate CreateFfplay(int volumePercent, string streamUrl)
+    {
+        var startInfo = CreateStartInfo("ffplay");
+        startInfo.ArgumentList.Add("-nodisp");
+        startInfo.ArgumentList.Add("-loglevel");
+        startInfo.ArgumentList.Add("error");
+        startInfo.ArgumentList.Add("-volume");
+        startInfo.ArgumentList.Add(volumePercent.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        startInfo.ArgumentList.Add(streamUrl);
+        return new LinuxPlayerCandidate("ffplay on the Linux default output", startInfo);
+    }
+
+    private static ProcessStartInfo CreateStartInfo(string fileName)
+    {
+        return new ProcessStartInfo
+        {
+            FileName = fileName,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true
+        };
     }
 }

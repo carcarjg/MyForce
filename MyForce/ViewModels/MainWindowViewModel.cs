@@ -1213,7 +1213,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		var settings = new MqttConnectionSettings(
 			Host: "127.0.0.1",
 			Port: 1883,
-			ClientId: $"myforce-ui-{Environment.MachineName}");
+			ClientId: $"myforce-ui-{Environment.MachineName}-{Environment.ProcessId}");
 
 		await _mqttConnectionService.ConnectAsync(settings).ConfigureAwait(false);
 		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.StateTopic).ConfigureAwait(false);
