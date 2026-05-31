@@ -1,12 +1,15 @@
 using System.Buffers;
 using System.Collections.ObjectModel;
+using System.Net.Http;
 using System.Text.Json;
 using MQTTnet;
+using NAudio.Wave;
 
 internal sealed class AudioProcessorCoordinator : IAsyncDisposable
 {
     private readonly AudioProcessorRegistry _registry;
     private readonly AudioFrameworkCatalog _audioFramework;
+    private readonly InternetRadioPlaybackController _internetRadioController;
     private readonly AudioMixerState _mixerState;
     private readonly AudioProcessorRoutingState _routingState;
     private readonly MqttServiceRuntime _mqttRuntime;
@@ -22,6 +25,7 @@ internal sealed class AudioProcessorCoordinator : IAsyncDisposable
         _topics = topics;
         _registry = AudioProcessorRegistry.CreateDefault();
         _audioFramework = AudioFrameworkCatalog.CreateDefault(_registry.RadioIds);
+        _internetRadioController = new InternetRadioPlaybackController();
         _mixerState = AudioMixerState.CreateDefault(_audioFramework.ChannelStrips);
         _routingState = AudioProcessorRoutingState.CreateDefault(_registry.RadioIds);
         _txController = new TxController(_registry.RadioIds);
@@ -80,12 +84,32 @@ internal sealed class AudioProcessorCoordinator : IAsyncDisposable
 
             _mixerState.SetMuted(command.ChannelId, command.IsMuted);
             await PublishMixerStateAsync(CancellationToken.None).ConfigureAwait(false);
+            return;
+        }
+
+        if (string.Equals(topic, _topics.InternetRadioPlayCommandTopic, StringComparison.OrdinalIgnoreCase))
+        {
+            var command = AudioProcessorJson.Deserialize<InternetRadioPlayCommand>(args.ApplicationMessage.Payload);
+            if (command is null)
+            {
+                return;
+            }
+
+            await _internetRadioController.PlayAsync(command, CancellationToken.None).ConfigureAwait(false);
+            await PublishInternetRadioStateAsync(CancellationToken.None).ConfigureAwait(false);
+            return;
+        }
+
+        if (string.Equals(topic, _topics.InternetRadioStopCommandTopic, StringComparison.OrdinalIgnoreCase))
+        {
+            _internetRadioController.Stop();
+            await PublishInternetRadioStateAsync(CancellationToken.None).ConfigureAwait(false);
         }
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
-        return ValueTask.CompletedTask;
+        await _internetRadioController.DisposeAsync().ConfigureAwait(false);
     }
 
     private void ApplyManualPtt(ManualPttRequest request)
@@ -130,6 +154,7 @@ internal sealed class AudioProcessorCoordinator : IAsyncDisposable
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
         await PublishMixerStateAsync(cancellationToken).ConfigureAwait(false);
+        await PublishInternetRadioStateAsync(cancellationToken).ConfigureAwait(false);
 
         await PublishStatusAsync(cancellationToken).ConfigureAwait(false);
     }
@@ -153,6 +178,18 @@ internal sealed class AudioProcessorCoordinator : IAsyncDisposable
                     radioCount: _registry.RadioIds.Count,
                     bridgeCount: _registry.Bridges.Count,
                     activeManualTransmitRadioId: _txController.ActiveManualTransmitRadioId?.Value)),
+            retain: true,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Publishes the current retained internet-radio playback state for reconnecting UI clients.
+    /// </summary>
+    private async Task PublishInternetRadioStateAsync(CancellationToken cancellationToken)
+    {
+        await _mqttRuntime.PublishAsync(
+            _topics.InternetRadioStateTopic,
+            AudioProcessorJson.Serialize(InternetRadioStatePayload.Create(_internetRadioController.CurrentState)),
             retain: true,
             cancellationToken: cancellationToken).ConfigureAwait(false);
     }
@@ -276,9 +313,15 @@ internal sealed class AudioProcessorTopicFactory
 
     public string ChannelMuteCommandTopic => $"{RootTopic}/cmd/channel-mute";
 
+    public string InternetRadioPlayCommandTopic => $"{RootTopic}/cmd/internet-radio/play";
+
+    public string InternetRadioStopCommandTopic => $"{RootTopic}/cmd/internet-radio/stop";
+
     public string AudioFrameworkTopic => $"{RootTopic}/state/audio-framework";
 
     public string AudioMixerStateTopic => $"{RootTopic}/state/audio-mixer";
+
+    public string InternetRadioStateTopic => $"{RootTopic}/state/internet-radio";
 
     public string RoutingStateTopic => $"{RootTopic}/state/routing";
 
@@ -551,6 +594,10 @@ internal sealed record AudioChannelGainCommand(string ChannelId, decimal Gain);
 
 internal sealed record AudioChannelMuteCommand(string ChannelId, bool IsMuted);
 
+internal sealed record InternetRadioPlayCommand(string StreamUrl, string DisplayName, string Genre, string Language);
+
+internal sealed record InternetRadioPlaybackState(bool IsPlaying, string? StreamUrl, string? DisplayName, string? Genre, string? Language, string Status, string Detail);
+
 internal sealed record ServiceRegistryPayload(
     string ServiceId,
     string DisplayName,
@@ -567,6 +614,30 @@ internal sealed record ServiceRegistryPayload(
             RadioIds: registry.RadioIds.Select(static radioId => radioId.Value).ToArray(),
             BridgeIds: registry.Bridges.Select(static bridge => bridge.Id.Value).ToArray());
     }
+
+internal sealed record InternetRadioStatePayload(
+    bool IsPlaying,
+    string? StreamUrl,
+    string? DisplayName,
+    string? Genre,
+    string? Language,
+    string Status,
+    string Detail)
+{
+    public static InternetRadioStatePayload Create(InternetRadioPlaybackState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+
+        return new InternetRadioStatePayload(
+            state.IsPlaying,
+            state.StreamUrl,
+            state.DisplayName,
+            state.Genre,
+            state.Language,
+            state.Status,
+            state.Detail);
+    }
+}
 }
 
 internal sealed record ServiceStatusPayload(
@@ -657,6 +728,30 @@ internal sealed record AudioMixerStatePayload(IReadOnlyList<AudioMixerChannelPay
     }
 }
 
+internal sealed record InternetRadioStatePayload(
+    bool IsPlaying,
+    string? StreamUrl,
+    string? DisplayName,
+    string? Genre,
+    string? Language,
+    string Status,
+    string Detail)
+{
+    public static InternetRadioStatePayload Create(InternetRadioPlaybackState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+
+        return new InternetRadioStatePayload(
+            state.IsPlaying,
+            state.StreamUrl,
+            state.DisplayName,
+            state.Genre,
+            state.Language,
+            state.Status,
+            state.Detail);
+    }
+}
+
 internal sealed record AudioDevicePayload(string DeviceId, string DisplayName, string Role, bool InputEnabled, bool OutputEnabled);
 
 internal sealed record AudioBusPayload(string BusId, string DisplayName, string Direction, IReadOnlyList<string> ChannelIds);
@@ -700,5 +795,76 @@ internal static class AudioProcessorJson
         }
 
         return JsonSerializer.Deserialize<T>(payload.ToArray(), SerializerOptions);
+    }
+}
+
+internal sealed class InternetRadioPlaybackController : IAsyncDisposable
+{
+    private readonly HttpClient _httpClient;
+    private IWavePlayer? _waveOut;
+    private MediaFoundationReader? _reader;
+
+    public InternetRadioPlaybackController()
+    {
+        _httpClient = new HttpClient();
+        CurrentState = new InternetRadioPlaybackState(false, null, null, null, null, "IDLE", "No internet radio stream selected.");
+    }
+
+    public InternetRadioPlaybackState CurrentState { get; private set; }
+
+    /// <summary>
+    /// Starts internet radio playback on the default output device using the provided stream metadata.
+    /// </summary>
+    public async Task PlayAsync(InternetRadioPlayCommand command, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentException.ThrowIfNullOrWhiteSpace(command.StreamUrl);
+        ArgumentException.ThrowIfNullOrWhiteSpace(command.DisplayName);
+
+        using var request = new HttpRequestMessage(HttpMethod.Head, command.StreamUrl);
+        using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        Stop();
+
+        _reader = new MediaFoundationReader(command.StreamUrl);
+        _waveOut = new WaveOutEvent();
+        _waveOut.Init(_reader);
+        _waveOut.Play();
+
+        CurrentState = new InternetRadioPlaybackState(
+            IsPlaying: true,
+            StreamUrl: command.StreamUrl,
+            DisplayName: command.DisplayName,
+            Genre: command.Genre,
+            Language: command.Language,
+            Status: "PLAYING",
+            Detail: "Internet radio stream playing on the default output.");
+    }
+
+    /// <summary>
+    /// Stops the current internet radio stream and releases playback resources.
+    /// </summary>
+    public void Stop()
+    {
+        _waveOut?.Stop();
+        _reader?.Dispose();
+        _waveOut?.Dispose();
+        _reader = null;
+        _waveOut = null;
+
+        CurrentState = CurrentState with
+        {
+            IsPlaying = false,
+            Status = "STOPPED",
+            Detail = "Internet radio playback stopped."
+        };
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        Stop();
+        _httpClient.Dispose();
+        return ValueTask.CompletedTask;
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Threading;
 using System.Threading.Tasks;
 using MQTTnet;
@@ -21,9 +22,12 @@ internal sealed class MqttConnectionService : IDisposable
 
         _mqttClient.ConnectedAsync += OnConnectedAsync;
         _mqttClient.DisconnectedAsync += OnDisconnectedAsync;
+        _mqttClient.ApplicationMessageReceivedAsync += OnApplicationMessageReceivedAsync;
     }
 
     public event EventHandler<MqttConnectionState>? StateChanged;
+
+    public event EventHandler<MqttApplicationMessage>? MessageReceived;
 
     public MqttConnectionState CurrentState
     {
@@ -81,6 +85,38 @@ internal sealed class MqttConnectionService : IDisposable
         }
     }
 
+    /// <summary>
+    /// Subscribes the UI shell to a broker topic for AP state updates.
+    /// </summary>
+    public async Task SubscribeAsync(string topicFilter, CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
+        ArgumentException.ThrowIfNullOrWhiteSpace(topicFilter);
+
+        var subscribeOptions = new MqttClientSubscribeOptionsBuilder()
+            .WithTopicFilter(topicFilter)
+            .Build();
+
+        await _mqttClient.SubscribeAsync(subscribeOptions, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Publishes a UI command message to the broker.
+    /// </summary>
+    public async Task PublishAsync(string topic, string payload, bool retain = false, CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
+        ArgumentException.ThrowIfNullOrWhiteSpace(topic);
+
+        var message = new MqttApplicationMessageBuilder()
+            .WithTopic(topic)
+            .WithPayload(payload)
+            .WithRetainFlag(retain)
+            .Build();
+
+        await _mqttClient.PublishAsync(message, cancellationToken).ConfigureAwait(false);
+    }
+
    public void Dispose()
     {
         if (_isDisposed)
@@ -91,6 +127,7 @@ internal sealed class MqttConnectionService : IDisposable
         _isDisposed = true;
         _mqttClient.ConnectedAsync -= OnConnectedAsync;
         _mqttClient.DisconnectedAsync -= OnDisconnectedAsync;
+        _mqttClient.ApplicationMessageReceivedAsync -= OnApplicationMessageReceivedAsync;
 
         _mqttClient.Dispose();
     }
@@ -107,6 +144,12 @@ internal sealed class MqttConnectionService : IDisposable
         var endpoint = CurrentState.Endpoint;
         var detail = arg.Exception?.Message ?? "Broker disconnected.";
         UpdateState(CreateDisconnectedState(detail, endpoint));
+        return Task.CompletedTask;
+    }
+
+    private Task OnApplicationMessageReceivedAsync(MqttApplicationMessageReceivedEventArgs arg)
+    {
+        MessageReceived?.Invoke(this, arg.ApplicationMessage);
         return Task.CompletedTask;
     }
 

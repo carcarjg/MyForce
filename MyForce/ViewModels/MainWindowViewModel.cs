@@ -22,8 +22,10 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Avalonia.Threading;
+using MQTTnet;
 using MyForce.Models;
 using MyForce.Services;
 
@@ -173,6 +175,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	private string _mqttDetail = "Broker not connected.";
 
+	private static readonly JsonSerializerOptions MqttJsonSerializerOptions = new()
+	{
+		PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+		WriteIndented = false,
+	};
+
 	private MainConsoleTab _selectedTab = MainConsoleTab.Patrol;
 
 	private bool _isAdminOverlayVisible;
@@ -203,6 +211,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		_internetRadioCatalogService = new InternetRadioCatalogService();
 		_mqttConnectionService = new MqttConnectionService();
 		_mqttConnectionService.StateChanged += OnMqttStateChanged;
+		_mqttConnectionService.MessageReceived += OnMqttMessageReceived;
 		_clockTimer = new DispatcherTimer
 		{
 			Interval = TimeSpan.FromSeconds(1),
@@ -912,6 +921,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		EnsureInternetStationVisible(stationIndex);
 		IsInternetChannelListVisible = false;
 		SaveAmFmUiState();
+		_ = PublishInternetRadioPlayCommandAsync(station);
 		RaiseInternetChannelListStateChanged();
 		RaiseAmFmStateChanged();
 	}
@@ -1002,6 +1012,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		_clockTimer.Stop();
 		_clockTimer.Tick -= OnClockTimerTick;
 		_mqttConnectionService.StateChanged -= OnMqttStateChanged;
+		_mqttConnectionService.MessageReceived -= OnMqttMessageReceived;
 		_mqttConnectionService.Dispose();
 	}
 
@@ -1013,6 +1024,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 			ClientId: $"myforce-ui-{Environment.MachineName}");
 
 		await _mqttConnectionService.ConnectAsync(settings).ConfigureAwait(false);
+		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.StateTopic).ConfigureAwait(false);
 	}
 
 	private void OnClockTimerTick(object? sender, EventArgs e)
@@ -1025,11 +1037,77 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		Dispatcher.UIThread.Post(() => ApplyMqttState(state));
 	}
 
+	private void OnMqttMessageReceived(object? sender, MqttApplicationMessage message)
+	{
+		if (!string.Equals(message.Topic, InternetRadioMqttTopics.StateTopic, StringComparison.OrdinalIgnoreCase))
+		{
+			return;
+		}
+
+		var payload = message.ConvertPayloadToString();
+		if (string.IsNullOrWhiteSpace(payload))
+		{
+			return;
+		}
+
+		var state = JsonSerializer.Deserialize<InternetRadioPlaybackStateMessage>(payload, MqttJsonSerializerOptions);
+		if (state is null)
+		{
+			return;
+		}
+
+		Dispatcher.UIThread.Post(() => ApplyInternetRadioPlaybackState(state));
+	}
+
 	private void ApplyMqttState(MqttConnectionState state)
 	{
 		MqttStatus = state.Status;
 		MqttEndpoint = string.IsNullOrWhiteSpace(state.Endpoint) ? "127.0.0.1:1883" : state.Endpoint;
 		MqttDetail = state.Detail;
+	}
+
+	/// <summary>
+	/// Applies retained AP internet radio playback state to the local UI without publishing commands back.
+	/// </summary>
+	private void ApplyInternetRadioPlaybackState(InternetRadioPlaybackStateMessage state)
+	{
+		ArgumentNullException.ThrowIfNull(state);
+
+		if (string.IsNullOrWhiteSpace(state.StreamUrl))
+		{
+			return;
+		}
+
+		var station = _internetRadioStations.FirstOrDefault(candidate =>
+			string.Equals(candidate.StreamUrl, state.StreamUrl, StringComparison.OrdinalIgnoreCase));
+
+		if (station is null)
+		{
+			return;
+		}
+
+		_selectedInternetStation = station;
+		EnsureInternetStationVisible(FilteredInternetRadioStations.ToList().FindIndex(candidate =>
+			string.Equals(candidate.StreamUrl, station.StreamUrl, StringComparison.OrdinalIgnoreCase)));
+		RaiseInternetChannelListStateChanged();
+		RaiseAmFmStateChanged();
+	}
+
+	/// <summary>
+	/// Publishes the selected INT station to the AP so playback can begin on the audio processor.
+	/// </summary>
+	private async Task PublishInternetRadioPlayCommandAsync(InternetRadioStation station)
+	{
+		ArgumentNullException.ThrowIfNull(station);
+
+		var command = new InternetRadioPlayCommandMessage(
+			station.StreamUrl,
+			station.DisplayName,
+			station.Genre,
+			station.Language);
+
+		var payload = JsonSerializer.Serialize(command, MqttJsonSerializerOptions);
+		await _mqttConnectionService.PublishAsync(InternetRadioMqttTopics.PlayCommandTopic, payload).ConfigureAwait(false);
 	}
 
 	private void UpdateClock()
