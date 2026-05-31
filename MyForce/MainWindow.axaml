@@ -881,17 +881,303 @@
                                 Height="637"
                                 IsVisible="{Binding IsAmFmContentVisible}"
                                 Padding="24">
-                            <Grid RowDefinitions="Auto,*"
-                                  RowSpacing="16">
-                                <TextBlock Classes="white"
-                                           FontSize="32"
-                                           Text="AM / FM" />
-                                <TextBlock Grid.Row="1"
-                                           Classes="white"
-                                           FontSize="22"
-                                           VerticalAlignment="Center"
-                                           HorizontalAlignment="Center"
-                                           Text="AM / FM tab content coming next." />
+                            <Grid Width="868"
+                                  Height="589"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"
+                                  ColumnDefinitions="358,486"
+                                  ColumnSpacing="24">
+                                <Grid Width="358"
+                                      Height="589"
+                                      RowDefinitions="226,224,123"
+                                      RowSpacing="16">
+                                    <Border Grid.Row="0"
+                                            Classes="panel"
+                                            Width="358"
+                                            Height="226"
+                                            Padding="18">
+                                        <Grid RowDefinitions="32,92,32"
+                                              RowSpacing="14">
+                                            <TextBlock Classes="white"
+                                                       FontSize="18"
+                                                       TextAlignment="Center"
+                                                       Text="AM/FM RADIO" />
+                                            <TextBlock Grid.Row="1"
+                                                       Foreground="{StaticResource SignalBrush}"
+                                                       FontFamily="Segoe UI"
+                                                       FontWeight="Bold"
+                                                       FontSize="42"
+                                                       TextAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Text="{Binding AmFmFrequencyDisplay}" />
+                                            <TextBlock Grid.Row="2"
+                                                       Classes="white"
+                                                       FontSize="18"
+                                                       TextAlignment="Center"
+                                                       Text="{Binding AmFmVolumeDisplay}" />
+                                        </Grid>
+                                    </Border>
+
+                                    <Border Grid.Row="1"
+                                            Classes="panel"
+                                            Width="358"
+                                            Height="224"
+                                            Padding="14">
+                                        <Grid RowDefinitions="30,1*,1*"
+                                              RowSpacing="10">
+                                            <TextBlock Classes="white"
+                                                       FontSize="18"
+                                                       TextAlignment="Center"
+                                                       Text="CHANNEL PRESETS" />
+                                            <Grid Grid.Row="1"
+                                                  ColumnDefinitions="103,103,103"
+                                                  ColumnSpacing="10"
+                                                  HorizontalAlignment="Center">
+                                                <Border Grid.Column="0" Classes="buttonFrame" Width="103" Height="78" PointerPressed="OnAmFmPreset1Pressed">
+                                                    <Viewbox Stretch="Uniform">
+                                                        <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="{Binding AmFmPreset1Label}" />
+                                                    </Viewbox>
+                                                </Border>
+                                                <Border Grid.Column="1" Classes="buttonFrame" Width="103" Height="78" PointerPressed="OnAmFmPreset2Pressed">
+                                                    <Viewbox Stretch="Uniform">
+                                                        <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="{Binding AmFmPreset2Label}" />
+                                                    </Viewbox>
+                                                </Border>
+                                                <Border Grid.Column="2" Classes="buttonFrame" Width="103" Height="78" PointerPressed="OnAmFmPreset3Pressed">
+                                                    <Viewbox Stretch="Uniform">
+                                                        <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="{Binding AmFmPreset3Label}" />
+                                                    </Viewbox>
+                                                </Border>
+                                            </Grid>
+                                            <Grid Grid.Row="2"
+                                                  ColumnDefinitions="103,103,103"
+                                                  ColumnSpacing="10"
+                                                  HorizontalAlignment="Center">
+                                                <Border Grid.Column="0" Classes="buttonFrame" Width="103" Height="78" PointerPressed="OnAmFmPreset4Pressed">
+                                                    <Viewbox Stretch="Uniform">
+                                                        <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="{Binding AmFmPreset4Label}" />
+                                                    </Viewbox>
+                                                </Border>
+                                                <Border Grid.Column="1" Classes="buttonFrame" Width="103" Height="78" PointerPressed="OnAmFmPreset5Pressed">
+                                                    <Viewbox Stretch="Uniform">
+                                                        <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="{Binding AmFmPreset5Label}" />
+                                                    </Viewbox>
+                                                </Border>
+                                                <Border Grid.Column="2" Classes="buttonFrame" Width="103" Height="78" PointerPressed="OnAmFmPreset6Pressed">
+                                                    <Viewbox Stretch="Uniform">
+                                                        <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="{Binding AmFmPreset6Label}" />
+                                                    </Viewbox>
+                                                </Border>
+                                            </Grid>
+                                        </Grid>
+                                    </Border>
+
+                                    <Border Grid.Row="2"
+                                            Classes="panel"
+                                            Width="358"
+                                            Height="123"
+                                            Padding="14">
+                                        <Grid RowDefinitions="30,65"
+                                              RowSpacing="10">
+                                            <TextBlock Classes="white"
+                                                       FontSize="18"
+                                                       TextAlignment="Center"
+                                                       Text="VOLUME" />
+                                            <Grid Grid.Row="1"
+                                                  ColumnDefinitions="159,159"
+                                                  ColumnSpacing="12"
+                                                  HorizontalAlignment="Center">
+                                                <Border Grid.Column="0" Classes="buttonFrame" Width="159" Height="65" PointerPressed="OnAmFmVolumeUpPressed">
+                                                    <Viewbox Stretch="Uniform">
+                                                        <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="▲" />
+                                                    </Viewbox>
+                                                </Border>
+                                                <Border Grid.Column="1" Classes="buttonFrame" Width="159" Height="65" PointerPressed="OnAmFmVolumeDownPressed">
+                                                    <Viewbox Stretch="Uniform">
+                                                        <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="▼" />
+                                                    </Viewbox>
+                                                </Border>
+                                            </Grid>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+
+                                <Grid Grid.Column="1"
+                                      Width="486"
+                                      Height="589"
+                                      RowDefinitions="176,397"
+                                      RowSpacing="16">
+                                    <Border Grid.Row="0"
+                                            Classes="panel"
+                                            Width="486"
+                                            Height="176"
+                                            Padding="16">
+                                        <Grid RowDefinitions="30,110"
+                                              RowSpacing="12">
+                                            <TextBlock Classes="white"
+                                                       FontSize="18"
+                                                       TextAlignment="Center"
+                                                       Text="AUDIO SOURCE" />
+                                            <Grid Grid.Row="1"
+                                                  ColumnDefinitions="140,140,140"
+                                                  RowDefinitions="49,49"
+                                                  ColumnSpacing="17"
+                                                  RowSpacing="12"
+                                                  HorizontalAlignment="Center">
+                                                <Grid Grid.Row="0" Grid.Column="0">
+                                                    <Border Classes="buttonFrame" Width="140" Height="49" PointerPressed="OnFm1SourcePressed" IsVisible="{Binding !IsFm1SourceSelected}">
+                                                        <Viewbox Stretch="Uniform">
+                                                            <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="FM1" />
+                                                        </Viewbox>
+                                                    </Border>
+                                                    <Border Classes="buttonFrame active" Width="140" Height="49" PointerPressed="OnFm1SourcePressed" IsVisible="{Binding IsFm1SourceSelected}">
+                                                        <Viewbox Stretch="Uniform">
+                                                            <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="FM1" />
+                                                        </Viewbox>
+                                                    </Border>
+                                                </Grid>
+                                                <Grid Grid.Row="0" Grid.Column="1">
+                                                    <Border Classes="buttonFrame" Width="140" Height="49" PointerPressed="OnAm1SourcePressed" IsVisible="{Binding !IsAm1SourceSelected}">
+                                                        <Viewbox Stretch="Uniform">
+                                                            <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="AM1" />
+                                                        </Viewbox>
+                                                    </Border>
+                                                    <Border Classes="buttonFrame active" Width="140" Height="49" PointerPressed="OnAm1SourcePressed" IsVisible="{Binding IsAm1SourceSelected}">
+                                                        <Viewbox Stretch="Uniform">
+                                                            <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="AM1" />
+                                                        </Viewbox>
+                                                    </Border>
+                                                </Grid>
+                                                <Grid Grid.Row="1" Grid.Column="0">
+                                                    <Border Classes="buttonFrame" Width="140" Height="49" PointerPressed="OnBluetoothSourcePressed" IsVisible="{Binding !IsBluetoothSourceSelected}">
+                                                        <Viewbox Stretch="Uniform">
+                                                            <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="BT" />
+                                                        </Viewbox>
+                                                    </Border>
+                                                    <Border Classes="buttonFrame active" Width="140" Height="49" PointerPressed="OnBluetoothSourcePressed" IsVisible="{Binding IsBluetoothSourceSelected}">
+                                                        <Viewbox Stretch="Uniform">
+                                                            <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="BT" />
+                                                        </Viewbox>
+                                                    </Border>
+                                                </Grid>
+                                                <Grid Grid.Row="1" Grid.Column="1">
+                                                    <Border Classes="buttonFrame" Width="140" Height="49" PointerPressed="OnInternetSourcePressed" IsVisible="{Binding !IsInternetSourceSelected}">
+                                                        <Viewbox Stretch="Uniform">
+                                                            <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="INT" />
+                                                        </Viewbox>
+                                                    </Border>
+                                                    <Border Classes="buttonFrame active" Width="140" Height="49" PointerPressed="OnInternetSourcePressed" IsVisible="{Binding IsInternetSourceSelected}">
+                                                        <Viewbox Stretch="Uniform">
+                                                            <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="INT" />
+                                                        </Viewbox>
+                                                    </Border>
+                                                </Grid>
+                                                <Grid Grid.Row="0" Grid.RowSpan="2" Grid.Column="2">
+                                                    <Border Classes="buttonFrame" Width="140" Height="110" PointerPressed="OnAmFmMutePressed" IsVisible="{Binding !IsAmFmMuted}">
+                                                        <Viewbox Stretch="Uniform">
+                                                            <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="MUTE" />
+                                                        </Viewbox>
+                                                    </Border>
+                                                    <Border Classes="buttonFrame active" Width="140" Height="110" PointerPressed="OnAmFmMutePressed" IsVisible="{Binding IsAmFmMuted}">
+                                                        <Viewbox Stretch="Uniform">
+                                                            <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="MUTE" />
+                                                        </Viewbox>
+                                                    </Border>
+                                                </Grid>
+                                            </Grid>
+                                        </Grid>
+                                    </Border>
+
+                                    <Grid Grid.Row="1"
+                                          Width="486"
+                                          Height="397"
+                                          ColumnDefinitions="154,154,154"
+                                          ColumnSpacing="12">
+                                        <Border Grid.Column="0"
+                                                Classes="panel"
+                                                Width="154"
+                                                Height="397"
+                                                Padding="12">
+                                            <Grid RowDefinitions="30,157,157"
+                                                  RowSpacing="14">
+                                                <TextBlock Classes="white"
+                                                           FontSize="18"
+                                                           TextAlignment="Center"
+                                                           Text="TUNE" />
+                                                <Border Grid.Row="1" Classes="buttonFrame" Width="130" Height="157" HorizontalAlignment="Center" PointerPressed="OnAmFmTuneUpPressed">
+                                                    <Viewbox Stretch="Uniform">
+                                                        <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="▲" />
+                                                    </Viewbox>
+                                                </Border>
+                                                <Border Grid.Row="2" Classes="buttonFrame" Width="130" Height="157" HorizontalAlignment="Center" PointerPressed="OnAmFmTuneDownPressed">
+                                                    <Viewbox Stretch="Uniform">
+                                                        <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="▼" />
+                                                    </Viewbox>
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+
+                                        <Border Grid.Column="1"
+                                                Classes="panel"
+                                                Width="154"
+                                                Height="397"
+                                                Padding="12">
+                                            <Grid RowDefinitions="30,157,157"
+                                                  RowSpacing="14">
+                                                <TextBlock Classes="white"
+                                                           FontSize="18"
+                                                           TextAlignment="Center"
+                                                           Text="SEEK" />
+                                                <Border Grid.Row="1" Classes="buttonFrame" Width="130" Height="157" HorizontalAlignment="Center" PointerPressed="OnAmFmSeekUpPressed">
+                                                    <Viewbox Stretch="Uniform">
+                                                        <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="▲" />
+                                                    </Viewbox>
+                                                </Border>
+                                                <Border Grid.Row="2" Classes="buttonFrame" Width="130" Height="157" HorizontalAlignment="Center" PointerPressed="OnAmFmSeekDownPressed">
+                                                    <Viewbox Stretch="Uniform">
+                                                        <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="▼" />
+                                                    </Viewbox>
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+
+                                        <Grid Grid.Column="2"
+                                              Width="154"
+                                              Height="397"
+                                              RowDefinitions="124,124,125"
+                                              RowSpacing="12">
+                                            <Border Grid.Row="0" Classes="buttonFrame" Width="154" Height="124" PointerPressed="OnAmFmScanPressed">
+                                                <Viewbox Stretch="Uniform">
+                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="SCAN" />
+                                                </Viewbox>
+                                            </Border>
+                                            <Border Grid.Row="1" Classes="buttonFrame" Width="154" Height="124" PointerPressed="OnAmFmChannelSetPressed">
+                                                <Viewbox Stretch="Uniform">
+                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="CH&#x0a;SET" />
+                                                </Viewbox>
+                                            </Border>
+                                            <Border Grid.Row="2" Classes="panel" Width="154" Height="125" Padding="12">
+                                                <Grid RowDefinitions="30,32,32"
+                                                      RowSpacing="8">
+                                                    <TextBlock Classes="white"
+                                                               FontSize="16"
+                                                               TextAlignment="Center"
+                                                               Text="AUX STATUS" />
+                                                    <TextBlock Grid.Row="1"
+                                                               Classes="white"
+                                                               FontSize="14"
+                                                               TextAlignment="Center"
+                                                               Text="{Binding AuxSourceStatusLine1}" />
+                                                    <TextBlock Grid.Row="2"
+                                                               Classes="white"
+                                                               FontSize="14"
+                                                               TextAlignment="Center"
+                                                               Text="{Binding AuxSourceStatusLine2}" />
+                                                </Grid>
+                                            </Border>
+                                        </Grid>
+                                    </Grid>
+                                </Grid>
                             </Grid>
                         </Border>
 

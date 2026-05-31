@@ -193,7 +193,99 @@ public partial class MainWindow : Window
 	{ }
 
 	private void OnAmFmMutePressed(object? sender, PointerPressedEventArgs e)
-	{ }
+	{
+		_viewModel.ToggleAmFmMute();
+	}
+
+	private void OnFm1SourcePressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.SelectAuxiliarySource(AuxiliaryAudioSourceMode.Fm1);
+	}
+
+	private void OnAm1SourcePressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.SelectAuxiliarySource(AuxiliaryAudioSourceMode.Am1);
+	}
+
+	private void OnBluetoothSourcePressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.SelectAuxiliarySource(AuxiliaryAudioSourceMode.Bluetooth);
+	}
+
+	private void OnInternetSourcePressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.SelectAuxiliarySource(AuxiliaryAudioSourceMode.InternetRadio);
+	}
+
+	private void OnAmFmTuneUpPressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.StepAmFmTuneUp();
+	}
+
+	private void OnAmFmTuneDownPressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.StepAmFmTuneDown();
+	}
+
+	private void OnAmFmSeekUpPressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.SeekAmFmUp();
+	}
+
+	private void OnAmFmSeekDownPressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.SeekAmFmDown();
+	}
+
+	private void OnAmFmScanPressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.ScanAmFm();
+	}
+
+	private void OnAmFmChannelSetPressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.StoreCurrentAmFmChannel();
+	}
+
+	private void OnAmFmVolumeUpPressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.IncreaseAmFmVolume();
+	}
+
+	private void OnAmFmVolumeDownPressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.DecreaseAmFmVolume();
+	}
+
+	private void OnAmFmPreset1Pressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.SelectAmFmPreset(0);
+	}
+
+	private void OnAmFmPreset2Pressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.SelectAmFmPreset(1);
+	}
+
+	private void OnAmFmPreset3Pressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.SelectAmFmPreset(2);
+	}
+
+	private void OnAmFmPreset4Pressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.SelectAmFmPreset(3);
+	}
+
+	private void OnAmFmPreset5Pressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.SelectAmFmPreset(4);
+	}
+
+	private void OnAmFmPreset6Pressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.SelectAmFmPreset(5);
+	}
 
 	private void OnCloseAdminPressed(object? sender, PointerPressedEventArgs e)
 	{

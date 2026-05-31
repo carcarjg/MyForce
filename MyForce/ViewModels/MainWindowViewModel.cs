@@ -78,8 +78,18 @@ public enum AlertCodeMode
 	Code3,
 }
 
+public enum AuxiliaryAudioSourceMode
+{
+	Fm1,
+	Am1,
+	Bluetooth,
+	InternetRadio,
+}
+
 public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 {
+	private static readonly decimal[] AmFmPresetStations = [88.1m, 88.1m, 88.1m, 88.1m, 88.1m, 88.1m];
+
 	private readonly DispatcherTimer _clockTimer;
 
 	private readonly MqttConnectionService _mqttConnectionService;
@@ -101,6 +111,16 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 	private string _sirenStatus = "DISABLED";
 
 	private string _currentTalkRadioVolume = "13";
+
+	private decimal _amFmFrequency = 97.5m;
+
+	private int _amFmVolume = 25;
+
+	private bool _isAmFmMuted;
+
+	private bool _isAmFmStereoEnabled = true;
+
+	private AuxiliaryAudioSourceMode _selectedAuxiliarySourceMode = AuxiliaryAudioSourceMode.Fm1;
 
 	private string _radio1ChannelName = "CT OPS 800";
 
@@ -254,6 +274,63 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		get => _currentTalkRadioVolume;
 		set => SetProperty(ref _currentTalkRadioVolume, value);
 	}
+
+	public string AmFmFrequencyDisplay => _amFmFrequency.ToString("0.0", CultureInfo.InvariantCulture);
+
+	public string AmFmBandLabel => _selectedAuxiliarySourceMode switch
+	{
+		AuxiliaryAudioSourceMode.Fm1 => "FM1",
+		AuxiliaryAudioSourceMode.Am1 => "AM1",
+		AuxiliaryAudioSourceMode.Bluetooth => "BT",
+		AuxiliaryAudioSourceMode.InternetRadio => "INT",
+		_ => throw new ArgumentOutOfRangeException(),
+	};
+
+	public string AmFmStereoLabel => _isAmFmStereoEnabled ? "STEREO" : "MONO";
+
+	public string AmFmVolumeDisplay => $"VOL: {_amFmVolume}";
+
+	public string AmFmActiveSourceSummary => _selectedAuxiliarySourceMode switch
+	{
+		AuxiliaryAudioSourceMode.Fm1 => "SOURCE: FM/AM -> AP MIX",
+		AuxiliaryAudioSourceMode.Am1 => "SOURCE: AM -> AP MIX",
+		AuxiliaryAudioSourceMode.Bluetooth => "SOURCE: BT -> AP MIX",
+		AuxiliaryAudioSourceMode.InternetRadio => "SOURCE: INT -> AP MIX",
+		_ => throw new ArgumentOutOfRangeException(),
+	};
+
+	public bool IsAmFmMuted => _isAmFmMuted;
+
+	public bool IsFm1SourceSelected => _selectedAuxiliarySourceMode == AuxiliaryAudioSourceMode.Fm1;
+
+	public bool IsAm1SourceSelected => _selectedAuxiliarySourceMode == AuxiliaryAudioSourceMode.Am1;
+
+	public bool IsBluetoothSourceSelected => _selectedAuxiliarySourceMode == AuxiliaryAudioSourceMode.Bluetooth;
+
+	public bool IsInternetSourceSelected => _selectedAuxiliarySourceMode == AuxiliaryAudioSourceMode.InternetRadio;
+
+	public string AuxSourceStatusLine1 => _selectedAuxiliarySourceMode switch
+	{
+		AuxiliaryAudioSourceMode.Fm1 => "FM/AM READY",
+		AuxiliaryAudioSourceMode.Am1 => "AM READY",
+		AuxiliaryAudioSourceMode.Bluetooth => "BT A2DP",
+		AuxiliaryAudioSourceMode.InternetRadio => "NET STREAM",
+		_ => throw new ArgumentOutOfRangeException(),
+	};
+
+	public string AuxSourceStatusLine2 => _isAmFmMuted ? "DUCKED / MUTE" : "LIVE TO AP";
+
+	public string AmFmPreset1Label => FormatPresetLabel(AmFmPresetStations[0]);
+
+	public string AmFmPreset2Label => FormatPresetLabel(AmFmPresetStations[1]);
+
+	public string AmFmPreset3Label => FormatPresetLabel(AmFmPresetStations[2]);
+
+	public string AmFmPreset4Label => FormatPresetLabel(AmFmPresetStations[3]);
+
+	public string AmFmPreset5Label => FormatPresetLabel(AmFmPresetStations[4]);
+
+	public string AmFmPreset6Label => FormatPresetLabel(AmFmPresetStations[5]);
 
 	public string Radio1ChannelName
 	{
@@ -522,6 +599,86 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		SelectedAlertCode = SelectedAlertCode == alertCode ? AlertCodeMode.Off : alertCode;
 	}
 
+	public void ToggleAmFmMute()
+	{
+		_isAmFmMuted = !_isAmFmMuted;
+		RaiseAmFmStateChanged();
+	}
+
+	public void SelectAuxiliarySource(AuxiliaryAudioSourceMode sourceMode)
+	{
+		_selectedAuxiliarySourceMode = sourceMode;
+
+		if (sourceMode == AuxiliaryAudioSourceMode.Am1)
+		{
+			_isAmFmStereoEnabled = false;
+		}
+		else if (sourceMode == AuxiliaryAudioSourceMode.Fm1)
+		{
+			_isAmFmStereoEnabled = true;
+		}
+
+		RaiseAmFmStateChanged();
+	}
+
+	public void StepAmFmTuneUp()
+	{
+		_amFmFrequency = decimal.Round(decimal.Min(_amFmFrequency + 0.2m, 107.9m), 1, MidpointRounding.AwayFromZero);
+		RaiseAmFmStateChanged();
+	}
+
+	public void StepAmFmTuneDown()
+	{
+		_amFmFrequency = decimal.Round(decimal.Max(_amFmFrequency - 0.2m, 87.5m), 1, MidpointRounding.AwayFromZero);
+		RaiseAmFmStateChanged();
+	}
+
+	public void SeekAmFmUp()
+	{
+		_amFmFrequency = decimal.Round(decimal.Min(_amFmFrequency + 0.5m, 107.9m), 1, MidpointRounding.AwayFromZero);
+		RaiseAmFmStateChanged();
+	}
+
+	public void SeekAmFmDown()
+	{
+		_amFmFrequency = decimal.Round(decimal.Max(_amFmFrequency - 0.5m, 87.5m), 1, MidpointRounding.AwayFromZero);
+		RaiseAmFmStateChanged();
+	}
+
+	public void ScanAmFm()
+	{
+		SeekAmFmUp();
+	}
+
+	public void StoreCurrentAmFmChannel()
+	{
+		_isAmFmStereoEnabled = !_isAmFmStereoEnabled;
+		RaiseAmFmStateChanged();
+	}
+
+	public void IncreaseAmFmVolume()
+	{
+		_amFmVolume = Math.Min(_amFmVolume + 1, 40);
+		RaiseAmFmStateChanged();
+	}
+
+	public void DecreaseAmFmVolume()
+	{
+		_amFmVolume = Math.Max(_amFmVolume - 1, 0);
+		RaiseAmFmStateChanged();
+	}
+
+	public void SelectAmFmPreset(int presetIndex)
+	{
+		if (presetIndex < 0 || presetIndex >= AmFmPresetStations.Length)
+		{
+			throw new ArgumentOutOfRangeException(nameof(presetIndex));
+		}
+
+		_amFmFrequency = AmFmPresetStations[presetIndex];
+		RaiseAmFmStateChanged();
+	}
+
 	public void Dispose()
 	{
 		_clockTimer.Stop();
@@ -597,6 +754,33 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Code1StateText)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Code2StateText)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Code3StateText)));
+	}
+
+	private void RaiseAmFmStateChanged()
+	{
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmFrequencyDisplay)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmBandLabel)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmStereoLabel)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmVolumeDisplay)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmActiveSourceSummary)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAmFmMuted)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsFm1SourceSelected)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAm1SourceSelected)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsBluetoothSourceSelected)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsInternetSourceSelected)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AuxSourceStatusLine1)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AuxSourceStatusLine2)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmPreset1Label)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmPreset2Label)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmPreset3Label)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmPreset4Label)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmPreset5Label)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmPreset6Label)));
+	}
+
+	private static string FormatPresetLabel(decimal frequency)
+	{
+		return frequency.ToString("0.0", CultureInfo.InvariantCulture);
 	}
 
 	private bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
