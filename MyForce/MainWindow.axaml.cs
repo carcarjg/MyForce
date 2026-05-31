@@ -242,9 +242,49 @@ public partial class MainWindow : Window
 		_viewModel.ScanAmFm();
 	}
 
+	private void OnAmFmChannelListPressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.ToggleInternetChannelList();
+	}
+
 	private void OnAmFmChannelSetPressed(object? sender, PointerPressedEventArgs e)
 	{
 		_viewModel.StoreCurrentAmFmChannel();
+	}
+
+	private void OnInternetGenreFilterPressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.CycleInternetGenreFilter();
+	}
+
+	private void OnInternetLanguageFilterPressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.CycleInternetLanguageFilter();
+	}
+
+	private void OnInternetStationsUpPressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.ScrollInternetStationsUp();
+	}
+
+	private void OnInternetStationsDownPressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.ScrollInternetStationsDown();
+	}
+
+	private void OnCloseInternetChannelListPressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.CloseInternetChannelList();
+	}
+
+	private void OnInternetStationPressed(object? sender, PointerPressedEventArgs e)
+	{
+		if (sender is not Border { Tag: string streamUrl } stationItem || string.IsNullOrWhiteSpace(streamUrl))
+		{
+			return;
+		}
+
+		_viewModel.SelectInternetStation(streamUrl);
 	}
 
 	private void OnAmFmVolumeUpPressed(object? sender, PointerPressedEventArgs e)

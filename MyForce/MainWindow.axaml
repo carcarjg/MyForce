@@ -3,6 +3,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:viewModels="using:MyForce.ViewModels"
+        xmlns:models="using:MyForce.Models"
         x:Class="MyForce.MainWindow"
         x:DataType="viewModels:MainWindowViewModel"
         mc:Ignorable="d"
@@ -679,12 +680,12 @@
                                         <Grid Grid.Column="1">
                                             <Border Classes="buttonFrame" Width="180" Height="58" PointerPressed="OnDirectionalCenterOutPressed" IsVisible="{Binding !IsDirectionalCenterOutSelected}">
                                                 <Viewbox Stretch="Uniform">
-                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="◀▶" />
+                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="◀ ▶" />
                                                 </Viewbox>
                                             </Border>
                                             <Border Classes="buttonFrame directionalActive" Width="180" Height="58" PointerPressed="OnDirectionalCenterOutPressed" IsVisible="{Binding IsDirectionalCenterOutSelected}">
                                                 <Viewbox Stretch="Uniform">
-                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="◀▶" />
+                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="◀ ▶" />
                                                 </Viewbox>
                                             </Border>
                                         </Grid>
@@ -901,20 +902,29 @@
                                             <TextBlock Classes="white"
                                                        FontSize="18"
                                                        TextAlignment="Center"
-                                                       Text="AM/FM RADIO" />
+                                                       Text="{Binding AmFmModuleTitle}" />
                                             <TextBlock Grid.Row="1"
                                                        Foreground="{StaticResource SignalBrush}"
                                                        FontFamily="Segoe UI"
                                                        FontWeight="Bold"
-                                                       FontSize="42"
-                                                       TextAlignment="Center"
-                                                       VerticalAlignment="Center"
-                                                       Text="{Binding AmFmFrequencyDisplay}" />
+                                                        FontSize="{Binding AmFmPrimaryDisplayFontSize}"
+                                                        TextAlignment="Center"
+                                                        VerticalAlignment="Center"
+                                                        TextWrapping="Wrap"
+                                                        MaxLines="2"
+                                                        Text="{Binding AmFmPrimaryDisplay}" />
                                             <TextBlock Grid.Row="2"
                                                        Classes="white"
                                                        FontSize="18"
                                                        TextAlignment="Center"
-                                                       Text="{Binding AmFmVolumeDisplay}" />
+                                                       Text="{Binding AmFmDetailLine}" />
+                                            <TextBlock Grid.Row="2"
+                                                       Margin="0,28,0,0"
+                                                       Classes="white"
+                                                       FontSize="16"
+                                                       TextAlignment="Center"
+                                                       IsVisible="{Binding IsAmFmDetailVisible}"
+                                                       Text="{Binding AmFmSecondaryDetailLine}" />
                                         </Grid>
                                     </Border>
 
@@ -1121,7 +1131,8 @@
                                                 Classes="panel"
                                                 Width="154"
                                                 Height="397"
-                                                Padding="12">
+                                                Padding="12"
+                                                IsVisible="{Binding IsSeekControlsVisible}">
                                             <Grid RowDefinitions="30,157,157"
                                                   RowSpacing="14">
                                                 <TextBlock Classes="white"
@@ -1140,40 +1151,45 @@
                                                 </Border>
                                             </Grid>
                                         </Border>
+                                        <Border Grid.Column="1"
+                                                Classes="panel"
+                                                Width="154"
+                                                Height="397"
+                                                Padding="12"
+                                                IsVisible="{Binding !IsSeekControlsVisible}">
+                                            <Grid RowDefinitions="30,*"
+                                                  RowSpacing="14">
+                                                <TextBlock Classes="white"
+                                                           FontSize="18"
+                                                           TextAlignment="Center"
+                                                           Text="SEEK" />
+                                            </Grid>
+                                        </Border>
 
                                         <Grid Grid.Column="2"
                                               Width="154"
                                               Height="397"
-                                              RowDefinitions="124,124,125"
+                                              RowDefinitions="124,124"
                                               RowSpacing="12">
-                                            <Border Grid.Row="0" Classes="buttonFrame" Width="154" Height="124" PointerPressed="OnAmFmScanPressed">
+                                            <Border Grid.Row="0"
+                                                    Classes="buttonFrame"
+                                                    Width="154"
+                                                    Height="124"
+                                                    PointerPressed="OnAmFmChannelListPressed"
+                                                    IsVisible="{Binding IsInternetChannelListButtonVisible}">
                                                 <Viewbox Stretch="Uniform">
-                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="SCAN" />
+                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="CH LIST" />
                                                 </Viewbox>
                                             </Border>
+                                            <Border Grid.Row="0"
+                                                    Classes="panel"
+                                                    Width="154"
+                                                    Height="124"
+                                                    IsVisible="{Binding !IsInternetChannelListButtonVisible}" />
                                             <Border Grid.Row="1" Classes="buttonFrame" Width="154" Height="124" PointerPressed="OnAmFmChannelSetPressed">
                                                 <Viewbox Stretch="Uniform">
                                                     <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="CH&#x0a;SET" />
                                                 </Viewbox>
-                                            </Border>
-                                            <Border Grid.Row="2" Classes="panel" Width="154" Height="125" Padding="12">
-                                                <Grid RowDefinitions="30,32,32"
-                                                      RowSpacing="8">
-                                                    <TextBlock Classes="white"
-                                                               FontSize="16"
-                                                               TextAlignment="Center"
-                                                               Text="AUX STATUS" />
-                                                    <TextBlock Grid.Row="1"
-                                                               Classes="white"
-                                                               FontSize="14"
-                                                               TextAlignment="Center"
-                                                               Text="{Binding AuxSourceStatusLine1}" />
-                                                    <TextBlock Grid.Row="2"
-                                                               Classes="white"
-                                                               FontSize="14"
-                                                               TextAlignment="Center"
-                                                               Text="{Binding AuxSourceStatusLine2}" />
-                                                </Grid>
                                             </Border>
                                         </Grid>
                                     </Grid>
@@ -1338,6 +1354,116 @@
                         </Border>
                     </Grid>
                 </Border>
+            </Grid>
+        </Border>
+
+        <Border IsVisible="{Binding IsInternetChannelListVisible}"
+                Background="#E6101010"
+                BorderBrush="{StaticResource PanelBorderBrush}"
+                BorderThickness="2"
+                Padding="18"
+                Margin="240,110,240,110"
+                ZIndex="90">
+            <Grid RowDefinitions="Auto,Auto,*,Auto"
+                  RowSpacing="14">
+                <TextBlock Classes="white"
+                           FontSize="26"
+                           Text="INT CHANNEL LIST" />
+
+                <Grid Grid.Row="1"
+                      ColumnDefinitions="*,*,Auto"
+                      ColumnSpacing="12">
+                    <Border Grid.Column="0"
+                            Classes="buttonFrame"
+                            PointerPressed="OnInternetGenreFilterPressed"
+                            Padding="10">
+                        <TextBlock Classes="white"
+                                   Text="{Binding InternetGenreFilter, StringFormat='GENRE: {0}'}" />
+                    </Border>
+                    <Border Grid.Column="1"
+                            Classes="buttonFrame"
+                            PointerPressed="OnInternetLanguageFilterPressed"
+                            Padding="10">
+                        <TextBlock Classes="white"
+                                   Text="{Binding InternetLanguageFilter, StringFormat='LANG: {0}'}" />
+                    </Border>
+                    <Border Grid.Column="2"
+                            Classes="buttonFrame"
+                            PointerPressed="OnCloseInternetChannelListPressed"
+                            Padding="10,10,14,10">
+                        <TextBlock Classes="white"
+                                   Text="CLOSE" />
+                    </Border>
+                </Grid>
+
+                <Grid Grid.Row="2"
+                      RowDefinitions="Auto,*,Auto"
+                      RowSpacing="12">
+                    <Grid ColumnDefinitions="Auto,*"
+                          ColumnSpacing="12">
+                        <Border Classes="buttonFrame"
+                                Width="96"
+                                Height="70"
+                                PointerPressed="OnInternetStationsUpPressed"
+                                IsEnabled="{Binding CanScrollInternetStationsUp}">
+                            <Viewbox Stretch="Uniform">
+                                <TextBlock Classes="white"
+                                           TextAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Text="▲" />
+                            </Viewbox>
+                        </Border>
+                        <TextBlock Grid.Column="1"
+                                   Classes="white"
+                                   VerticalAlignment="Center"
+                                   Text="Touch-friendly paging for Internet radio channels." />
+                    </Grid>
+
+                    <ItemsControl Grid.Row="1"
+                                  ItemsSource="{Binding VisibleInternetRadioStations}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:InternetRadioStation">
+                                <Border Classes="buttonFrame"
+                                        Margin="0,0,0,10"
+                                        Padding="12"
+                                        PointerPressed="OnInternetStationPressed"
+                                        Tag="{Binding StreamUrl}">
+                                    <Grid ColumnDefinitions="2*,*,Auto"
+                                          ColumnSpacing="12">
+                                        <TextBlock Classes="white"
+                                                   Text="{Binding DisplayName}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Classes="white"
+                                                   Text="{Binding Genre}" />
+                                        <TextBlock Grid.Column="2"
+                                                   Classes="white"
+                                                   Text="{Binding Language}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Border Grid.Row="2"
+                            Classes="buttonFrame"
+                            Width="96"
+                            Height="70"
+                            HorizontalAlignment="Left"
+                            PointerPressed="OnInternetStationsDownPressed"
+                            IsEnabled="{Binding CanScrollInternetStationsDown}">
+                        <Viewbox Stretch="Uniform">
+                            <TextBlock Classes="white"
+                                       TextAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Text="▼" />
+                        </Viewbox>
+                    </Border>
+                </Grid>
+
+                <TextBlock Grid.Row="3"
+                           Classes="white"
+                           FontSize="14"
+                           Text="Select A Station" />
             </Grid>
         </Border>
     </Grid>

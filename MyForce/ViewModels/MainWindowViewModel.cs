@@ -16,8 +16,11 @@
 // Copyright (C) 2025-2026 NyxTel Wireless / Nyx Gallini
 //
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
+using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Avalonia.Threading;
@@ -90,7 +93,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 {
 	private static readonly decimal[] AmFmPresetStations = [88.1m, 88.1m, 88.1m, 88.1m, 88.1m, 88.1m];
 
+	private const int InternetStationViewportSize = 6;
+
 	private readonly DispatcherTimer _clockTimer;
+
+	private readonly InternetRadioCatalogService _internetRadioCatalogService;
+
+	private readonly AmFmUiStateStore _amFmUiStateStore;
 
 	private readonly MqttConnectionService _mqttConnectionService;
 
@@ -116,11 +125,27 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	private int _amFmVolume = 25;
 
+	private decimal _amFrequency = 87.5m;
+
 	private bool _isAmFmMuted;
 
 	private bool _isAmFmStereoEnabled = true;
 
 	private AuxiliaryAudioSourceMode _selectedAuxiliarySourceMode = AuxiliaryAudioSourceMode.Fm1;
+
+	private bool _isInternetChannelListVisible;
+
+	private string _internetGenreFilter = "ALL";
+
+	private string _internetLanguageFilter = "ALL";
+
+	private InternetRadioStation? _selectedInternetStation;
+
+	private string _bluetoothDisplayLabel = "BT AUDIO";
+
+	private IReadOnlyList<InternetRadioStation> _internetRadioStations = Array.Empty<InternetRadioStation>();
+
+	private int _internetStationViewportStartIndex;
 
 	private string _radio1ChannelName = "CT OPS 800";
 
@@ -174,6 +199,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	public MainWindowViewModel()
 	{
+		_amFmUiStateStore = new AmFmUiStateStore();
+		_internetRadioCatalogService = new InternetRadioCatalogService();
 		_mqttConnectionService = new MqttConnectionService();
 		_mqttConnectionService.StateChanged += OnMqttStateChanged;
 		_clockTimer = new DispatcherTimer
@@ -183,6 +210,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 		_clockTimer.Tick += OnClockTimerTick;
 		UpdateClock();
+		LoadInternetRadioCatalog();
+		RestoreAmFmUiState();
 		ApplyMqttState(_mqttConnectionService.CurrentState);
 		_clockTimer.Start();
 		_ = InitializeMqttAsync();
@@ -277,6 +306,36 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	public string AmFmFrequencyDisplay => _amFmFrequency.ToString("0.0", CultureInfo.InvariantCulture);
 
+	/// <summary>
+	/// Gets the source-aware title shown above the primary AM/FM display area.
+	/// </summary>
+	public string AmFmModuleTitle => _selectedAuxiliarySourceMode switch
+	{
+		AuxiliaryAudioSourceMode.Fm1 => "FM RADIO",
+		AuxiliaryAudioSourceMode.Am1 => "AM RADIO",
+		AuxiliaryAudioSourceMode.Bluetooth => "BLUETOOTH",
+		AuxiliaryAudioSourceMode.InternetRadio => "INTERNET RADIO",
+		_ => throw new ArgumentOutOfRangeException(),
+	};
+
+	/// <summary>
+	/// Gets the primary source display, switching to the selected station name for INT mode.
+	/// </summary>
+	public string AmFmPrimaryDisplay => _selectedAuxiliarySourceMode switch
+	{
+		AuxiliaryAudioSourceMode.InternetRadio => _selectedInternetStation?.DisplayName ?? "NO CHANNEL",
+		AuxiliaryAudioSourceMode.Bluetooth => _bluetoothDisplayLabel,
+		AuxiliaryAudioSourceMode.Am1 => _amFrequency.ToString("0.0", CultureInfo.InvariantCulture),
+		_ => AmFmFrequencyDisplay,
+	};
+
+	/// <summary>
+	/// Gets the font size for the primary display so long INT station names remain visible.
+	/// </summary>
+	public double AmFmPrimaryDisplayFontSize => _selectedAuxiliarySourceMode == AuxiliaryAudioSourceMode.InternetRadio
+		? 24d
+		: 42d;
+
 	public string AmFmBandLabel => _selectedAuxiliarySourceMode switch
 	{
 		AuxiliaryAudioSourceMode.Fm1 => "FM1",
@@ -289,6 +348,81 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 	public string AmFmStereoLabel => _isAmFmStereoEnabled ? "STEREO" : "MONO";
 
 	public string AmFmVolumeDisplay => $"VOL: {_amFmVolume}";
+
+	/// <summary>
+	/// Gets the entertainment source volume readout shown under the primary display.
+	/// </summary>
+	public string AmFmDetailLine => AmFmVolumeDisplay;
+
+	/// <summary>
+	/// Gets the INT-only metadata line shown beneath the volume readout.
+	/// </summary>
+	public string AmFmSecondaryDetailLine => _selectedAuxiliarySourceMode switch
+	{
+		AuxiliaryAudioSourceMode.InternetRadio => _selectedInternetStation is null
+			? "NO CHANNEL"
+			: $"{_selectedInternetStation.Genre} / {_selectedInternetStation.Language}",
+		_ => string.Empty,
+	};
+
+	/// <summary>
+	/// Indicates whether the INT-only metadata line should be shown for the current mode.
+	/// </summary>
+	public bool IsAmFmDetailVisible => _selectedAuxiliarySourceMode == AuxiliaryAudioSourceMode.InternetRadio;
+
+	/// <summary>
+	/// Indicates whether the seek controls should be visible for tuner-based sources.
+	/// </summary>
+	public bool IsSeekControlsVisible => _selectedAuxiliarySourceMode is AuxiliaryAudioSourceMode.Fm1 or AuxiliaryAudioSourceMode.Am1;
+
+	public bool IsInternetChannelListVisible
+	{
+		get => _isInternetChannelListVisible;
+		private set => SetProperty(ref _isInternetChannelListVisible, value);
+	}
+
+	public bool IsInternetChannelListButtonVisible => IsInternetSourceSelected;
+
+	/// <summary>
+	/// Gets the touch-friendly station subset displayed inside the INT popup.
+	/// </summary>
+	public IReadOnlyList<InternetRadioStation> VisibleInternetRadioStations => FilteredInternetRadioStations
+		.Skip(_internetStationViewportStartIndex)
+		.Take(InternetStationViewportSize)
+		.ToArray();
+
+	public bool CanScrollInternetStationsUp => _internetStationViewportStartIndex > 0;
+
+	public bool CanScrollInternetStationsDown => _internetStationViewportStartIndex + InternetStationViewportSize < FilteredInternetRadioStations.Count;
+
+	public string InternetGenreFilter => _internetGenreFilter;
+
+	public string InternetLanguageFilter => _internetLanguageFilter;
+
+	public string InternetSelectedStationName => _selectedInternetStation?.DisplayName ?? "NO CHANNEL";
+
+	public string InternetSelectedStreamUrl => _selectedInternetStation?.StreamUrl ?? "NO STREAM URL";
+
+	public string InternetSelectedMetadata => _selectedInternetStation is null
+		? "Select an INT channel."
+		: $"{_selectedInternetStation.Genre} / {_selectedInternetStation.Language} / {_selectedInternetStation.Bitrate} kbps";
+
+	public IReadOnlyList<string> InternetGenreOptions => ["ALL", .. _internetRadioStations
+		.Select(static station => station.Genre)
+		.Where(static genre => !string.IsNullOrWhiteSpace(genre))
+		.Distinct(StringComparer.OrdinalIgnoreCase)
+		.OrderBy(static genre => genre, StringComparer.OrdinalIgnoreCase)];
+
+	public IReadOnlyList<string> InternetLanguageOptions => ["ALL", .. _internetRadioStations
+		.Select(static station => station.Language)
+		.Where(static language => !string.IsNullOrWhiteSpace(language))
+		.Distinct(StringComparer.OrdinalIgnoreCase)
+		.OrderBy(static language => language, StringComparer.OrdinalIgnoreCase)];
+
+	public IReadOnlyList<InternetRadioStation> FilteredInternetRadioStations => _internetRadioStations
+		.Where(station => string.Equals(_internetGenreFilter, "ALL", StringComparison.OrdinalIgnoreCase) || string.Equals(station.Genre, _internetGenreFilter, StringComparison.OrdinalIgnoreCase))
+		.Where(station => string.Equals(_internetLanguageFilter, "ALL", StringComparison.OrdinalIgnoreCase) || string.Equals(station.Language, _internetLanguageFilter, StringComparison.OrdinalIgnoreCase))
+		.ToArray();
 
 	public string AmFmActiveSourceSummary => _selectedAuxiliarySourceMode switch
 	{
@@ -602,12 +736,73 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 	public void ToggleAmFmMute()
 	{
 		_isAmFmMuted = !_isAmFmMuted;
+		SaveAmFmUiState();
+		RaiseAmFmStateChanged();
+	}
+
+	/// <summary>
+	/// Moves the active INT station selection backward or forward through the filtered list.
+	/// </summary>
+	public void StepInternetStation(int delta)
+	{
+		if (!IsInternetSourceSelected)
+		{
+			return;
+		}
+
+		var stations = FilteredInternetRadioStations;
+		if (stations.Count == 0)
+		{
+			_selectedInternetStation = null;
+			RaiseInternetChannelListStateChanged();
+			RaiseAmFmStateChanged();
+			return;
+		}
+
+		var currentIndex = 0;
+		if (_selectedInternetStation is not null)
+		{
+			for (var index = 0; index < stations.Count; index++)
+			{
+				if (!Equals(stations[index], _selectedInternetStation))
+				{
+					continue;
+				}
+
+				currentIndex = index;
+				break;
+			}
+		}
+
+		if (currentIndex < 0)
+		{
+			currentIndex = 0;
+		}
+
+		var nextIndex = currentIndex + delta;
+		if (nextIndex < 0)
+		{
+			nextIndex = stations.Count - 1;
+		}
+		else if (nextIndex >= stations.Count)
+		{
+			nextIndex = 0;
+		}
+
+		_selectedInternetStation = stations[nextIndex];
+		EnsureInternetStationVisible(nextIndex);
+		SaveAmFmUiState();
+		RaiseInternetChannelListStateChanged();
 		RaiseAmFmStateChanged();
 	}
 
 	public void SelectAuxiliarySource(AuxiliaryAudioSourceMode sourceMode)
 	{
 		_selectedAuxiliarySourceMode = sourceMode;
+		if (sourceMode != AuxiliaryAudioSourceMode.InternetRadio)
+		{
+			IsInternetChannelListVisible = false;
+		}
 
 		if (sourceMode == AuxiliaryAudioSourceMode.Am1)
 		{
@@ -618,18 +813,139 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 			_isAmFmStereoEnabled = true;
 		}
 
+		SaveAmFmUiState();
+		RaiseAmFmStateChanged();
+	}
+
+	public void ToggleInternetChannelList()
+	{
+		if (!IsInternetSourceSelected)
+		{
+			return;
+		}
+
+		IsInternetChannelListVisible = !IsInternetChannelListVisible;
+		RaiseInternetChannelListStateChanged();
+	}
+
+	public void CloseInternetChannelList()
+	{
+		if (!IsInternetChannelListVisible)
+		{
+			return;
+		}
+
+		IsInternetChannelListVisible = false;
+		RaiseInternetChannelListStateChanged();
+	}
+
+	public void CycleInternetGenreFilter()
+	{
+		_internetGenreFilter = GetNextFilterValue(InternetGenreOptions, _internetGenreFilter);
+		ResetInternetStationViewport(preserveSelection: true);
+		RaiseInternetChannelListStateChanged();
+		RaiseAmFmStateChanged();
+	}
+
+	public void CycleInternetLanguageFilter()
+	{
+		_internetLanguageFilter = GetNextFilterValue(InternetLanguageOptions, _internetLanguageFilter);
+		ResetInternetStationViewport(preserveSelection: true);
+		RaiseInternetChannelListStateChanged();
+		RaiseAmFmStateChanged();
+	}
+
+	/// <summary>
+	/// Scrolls the visible INT station window upward for touch-friendly browsing.
+	/// </summary>
+	public void ScrollInternetStationsUp()
+	{
+		if (!CanScrollInternetStationsUp)
+		{
+			return;
+		}
+
+		_internetStationViewportStartIndex = Math.Max(0, _internetStationViewportStartIndex - 1);
+		RaiseInternetChannelListStateChanged();
+	}
+
+	/// <summary>
+	/// Scrolls the visible INT station window downward for touch-friendly browsing.
+	/// </summary>
+	public void ScrollInternetStationsDown()
+	{
+		if (!CanScrollInternetStationsDown)
+		{
+			return;
+		}
+
+		_internetStationViewportStartIndex = Math.Min(FilteredInternetRadioStations.Count - InternetStationViewportSize, _internetStationViewportStartIndex + 1);
+		RaiseInternetChannelListStateChanged();
+	}
+
+	public void SelectInternetStation(string streamUrl)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(streamUrl);
+
+		var station = FilteredInternetRadioStations
+			.FirstOrDefault(candidate => string.Equals(candidate.StreamUrl, streamUrl, StringComparison.OrdinalIgnoreCase));
+
+		if (station is null)
+		{
+			throw new InvalidOperationException($"Unknown internet radio stream '{streamUrl}'.");
+		}
+
+		_selectedInternetStation = station;
+		var stationIndex = -1;
+		var filteredStations = FilteredInternetRadioStations;
+		for (var index = 0; index < filteredStations.Count; index++)
+		{
+			if (!Equals(filteredStations[index], station))
+			{
+				continue;
+			}
+
+			stationIndex = index;
+			break;
+		}
+
+		EnsureInternetStationVisible(stationIndex);
+		IsInternetChannelListVisible = false;
+		SaveAmFmUiState();
+		RaiseInternetChannelListStateChanged();
 		RaiseAmFmStateChanged();
 	}
 
 	public void StepAmFmTuneUp()
 	{
+		if (IsInternetSourceSelected)
+		{
+			StepInternetStation(1);
+			return;
+		}
+
 		_amFmFrequency = decimal.Round(decimal.Min(_amFmFrequency + 0.2m, 107.9m), 1, MidpointRounding.AwayFromZero);
 		RaiseAmFmStateChanged();
 	}
 
 	public void StepAmFmTuneDown()
 	{
+		if (IsInternetSourceSelected)
+		{
+			StepInternetStation(-1);
+			return;
+		}
+
+		if (IsAm1SourceSelected)
+		{
+			_amFrequency = decimal.Round(decimal.Max(_amFrequency - 0.2m, 87.5m), 1, MidpointRounding.AwayFromZero);
+			SaveAmFmUiState();
+			RaiseAmFmStateChanged();
+			return;
+		}
+
 		_amFmFrequency = decimal.Round(decimal.Max(_amFmFrequency - 0.2m, 87.5m), 1, MidpointRounding.AwayFromZero);
+		SaveAmFmUiState();
 		RaiseAmFmStateChanged();
 	}
 
@@ -659,12 +975,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 	public void IncreaseAmFmVolume()
 	{
 		_amFmVolume = Math.Min(_amFmVolume + 1, 40);
+		SaveAmFmUiState();
 		RaiseAmFmStateChanged();
 	}
 
 	public void DecreaseAmFmVolume()
 	{
 		_amFmVolume = Math.Max(_amFmVolume - 1, 0);
+		SaveAmFmUiState();
 		RaiseAmFmStateChanged();
 	}
 
@@ -758,24 +1076,175 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	private void RaiseAmFmStateChanged()
 	{
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmModuleTitle)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmPrimaryDisplay)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmPrimaryDisplayFontSize)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmFrequencyDisplay)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmBandLabel)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmStereoLabel)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmVolumeDisplay)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmActiveSourceSummary)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmDetailLine)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmSecondaryDetailLine)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAmFmDetailVisible)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSeekControlsVisible)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAmFmMuted)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsFm1SourceSelected)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAm1SourceSelected)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsBluetoothSourceSelected)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsInternetSourceSelected)));
-		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AuxSourceStatusLine1)));
-		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AuxSourceStatusLine2)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsInternetChannelListButtonVisible)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmPreset1Label)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmPreset2Label)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmPreset3Label)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmPreset4Label)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmPreset5Label)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmPreset6Label)));
+	}
+
+	private void RaiseInternetChannelListStateChanged()
+	{
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsInternetChannelListVisible)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(InternetGenreFilter)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(InternetLanguageFilter)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(InternetSelectedStationName)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(InternetSelectedStreamUrl)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(InternetSelectedMetadata)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(InternetGenreOptions)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(InternetLanguageOptions)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FilteredInternetRadioStations)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(VisibleInternetRadioStations)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanScrollInternetStationsUp)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanScrollInternetStationsDown)));
+	}
+
+	private void LoadInternetRadioCatalog()
+	{
+		var streamsPath = Path.Combine(AppContext.BaseDirectory, "streams.sii");
+		_internetRadioStations = _internetRadioCatalogService.LoadCatalog(streamsPath);
+		_selectedInternetStation = _internetRadioStations.FirstOrDefault();
+		ResetInternetStationViewport(preserveSelection: false);
+		RaiseInternetChannelListStateChanged();
+	}
+
+	/// <summary>
+	/// Resets the INT popup viewport when the filtered station list changes.
+	/// </summary>
+	private void ResetInternetStationViewport(bool preserveSelection)
+	{
+		_internetStationViewportStartIndex = 0;
+		if (!preserveSelection)
+		{
+			_selectedInternetStation = FilteredInternetRadioStations.FirstOrDefault();
+			return;
+		}
+
+		if (_selectedInternetStation is null)
+		{
+			return;
+		}
+
+		if (FilteredInternetRadioStations.Any(station => string.Equals(station.StreamUrl, _selectedInternetStation.StreamUrl, StringComparison.OrdinalIgnoreCase)))
+		{
+			return;
+		}
+	}
+
+	/// <summary>
+	/// Restores the last selected mode and per-mode source selections from local state.
+	/// </summary>
+	private void RestoreAmFmUiState()
+	{
+		var savedState = _amFmUiStateStore.Load();
+		_amFmFrequency = savedState.FmFrequency;
+		_amFrequency = savedState.AmFrequency;
+		_bluetoothDisplayLabel = string.IsNullOrWhiteSpace(savedState.BluetoothLabel) ? "BT AUDIO" : savedState.BluetoothLabel;
+		_isAmFmMuted = savedState.IsMuted;
+		_amFmVolume = Math.Clamp(savedState.Volume, 0, 40);
+
+		if (!string.IsNullOrWhiteSpace(savedState.InternetStreamUrl))
+		{
+			_selectedInternetStation = _internetRadioStations.FirstOrDefault(station =>
+				string.Equals(station.StreamUrl, savedState.InternetStreamUrl, StringComparison.OrdinalIgnoreCase))
+				?? _selectedInternetStation;
+		}
+
+		if (!Enum.TryParse<AuxiliaryAudioSourceMode>(savedState.LastMode, ignoreCase: true, out var restoredMode))
+		{
+			restoredMode = AuxiliaryAudioSourceMode.Fm1;
+		}
+
+		_selectedAuxiliarySourceMode = restoredMode;
+		ResetInternetStationViewport(preserveSelection: true);
+	}
+
+	/// <summary>
+	/// Saves the current mode and source selections for restoration on the next launch.
+	/// </summary>
+	private void SaveAmFmUiState()
+	{
+		var state = new AmFmUiState(
+			LastMode: _selectedAuxiliarySourceMode.ToString(),
+			FmFrequency: _amFmFrequency,
+			AmFrequency: _amFrequency,
+			BluetoothLabel: _bluetoothDisplayLabel,
+			InternetStreamUrl: _selectedInternetStation?.StreamUrl,
+			IsMuted: _isAmFmMuted,
+			Volume: _amFmVolume);
+
+		_amFmUiStateStore.Save(state);
+	}
+
+	/// <summary>
+	/// Keeps the selected INT station inside the visible touch-scrolling window.
+	/// </summary>
+	private void EnsureInternetStationVisible(int stationIndex)
+	{
+		if (stationIndex < 0)
+		{
+			return;
+		}
+
+		if (stationIndex < _internetStationViewportStartIndex)
+		{
+			_internetStationViewportStartIndex = stationIndex;
+			return;
+		}
+
+		if (stationIndex < _internetStationViewportStartIndex + InternetStationViewportSize)
+		{
+			return;
+		}
+
+		_internetStationViewportStartIndex = stationIndex - InternetStationViewportSize + 1;
+	}
+
+	private static string GetNextFilterValue(IReadOnlyList<string> values, string currentValue)
+	{
+		if (values.Count == 0)
+		{
+			return "ALL";
+		}
+
+		var currentIndex = -1;
+		for (var index = 0; index < values.Count; index++)
+		{
+			if (!string.Equals(values[index], currentValue, StringComparison.OrdinalIgnoreCase))
+			{
+				continue;
+			}
+
+			currentIndex = index;
+			break;
+		}
+
+		if (currentIndex < 0)
+		{
+			return values[0];
+		}
+
+		var nextIndex = (currentIndex + 1) % values.Count;
+		return values[nextIndex];
 	}
 
 	private static string FormatPresetLabel(decimal frequency)
