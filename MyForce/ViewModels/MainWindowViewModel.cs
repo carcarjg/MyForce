@@ -26,6 +26,17 @@ using MyForce.Services;
 
 namespace MyForce.ViewModels;
 
+public enum MainConsoleTab
+{
+	Patrol,
+	LightsAndSirens,
+	Radio,
+	Radar,
+	AmFm,
+	Cad,
+	Camera,
+}
+
 public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 {
 	private readonly DispatcherTimer _clockTimer;
@@ -73,6 +84,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 	private string _mqttEndpoint = "127.0.0.1:1883";
 
 	private string _mqttDetail = "Broker not connected.";
+
+	private MainConsoleTab _selectedTab = MainConsoleTab.Patrol;
 
 	public string _CurSelChExt1;
 
@@ -245,6 +258,53 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		set => SetProperty(ref _proximityChannel4, value);
 	}
 
+	public MainConsoleTab SelectedTab
+	{
+		get => _selectedTab;
+		private set
+		{
+			if (!SetProperty(ref _selectedTab, value))
+			{
+				return;
+			}
+
+			RaiseTabStateChanged();
+		}
+	}
+
+	public bool IsPatrolTabSelected => SelectedTab == MainConsoleTab.Patrol;
+
+	public bool IsLightsAndSirensTabSelected => SelectedTab == MainConsoleTab.LightsAndSirens;
+
+	public bool IsRadioTabSelected => SelectedTab == MainConsoleTab.Radio;
+
+	public bool IsRadarTabSelected => SelectedTab == MainConsoleTab.Radar;
+
+	public bool IsAmFmTabSelected => SelectedTab == MainConsoleTab.AmFm;
+
+	public bool IsCadTabSelected => SelectedTab == MainConsoleTab.Cad;
+
+	public bool IsCameraTabSelected => SelectedTab == MainConsoleTab.Camera;
+
+	public bool IsPatrolContentVisible => IsPatrolTabSelected;
+
+	public bool IsLightsAndSirensContentVisible => IsLightsAndSirensTabSelected;
+
+	public bool IsRadioContentVisible => IsRadioTabSelected;
+
+	public bool IsRadarContentVisible => IsRadarTabSelected;
+
+	public bool IsAmFmContentVisible => IsAmFmTabSelected;
+
+	public bool IsCadContentVisible => IsCadTabSelected;
+
+	public bool IsCameraContentVisible => IsCameraTabSelected;
+
+	public void SelectTab(MainConsoleTab tab)
+	{
+		SelectedTab = tab;
+	}
+
 	public void Dispose()
 	{
 		_clockTimer.Stop();
@@ -287,14 +347,33 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		Date = now.ToString("dd MMM yyyy", CultureInfo.InvariantCulture).ToUpperInvariant();
 	}
 
-	private void SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+	private void RaiseTabStateChanged()
+	{
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsPatrolTabSelected)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsLightsAndSirensTabSelected)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsRadioTabSelected)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsRadarTabSelected)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAmFmTabSelected)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsCadTabSelected)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsCameraTabSelected)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsPatrolContentVisible)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsLightsAndSirensContentVisible)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsRadioContentVisible)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsRadarContentVisible)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAmFmContentVisible)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsCadContentVisible)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsCameraContentVisible)));
+	}
+
+	private bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
 	{
 		if (Equals(field, value))
 		{
-			return;
+			return false;
 		}
 
 		field = value;
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+		return true;
 	}
 }

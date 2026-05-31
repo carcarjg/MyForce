@@ -68,25 +68,39 @@ public partial class MainWindow : Window
 	}
 
 	private void OnPatrolTabPressed(object? sender, PointerPressedEventArgs e)
-	{ }
+	{
+		SelectTab(MainConsoleTab.Patrol);
+	}
 
 	private void OnLightsAndSirensTabPressed(object? sender, PointerPressedEventArgs e)
-	{ }
+	{
+		SelectTab(MainConsoleTab.LightsAndSirens);
+	}
 
 	private void OnRadioTabPressed(object? sender, PointerPressedEventArgs e)
-	{ }
+	{
+		SelectTab(MainConsoleTab.Radio);
+	}
 
 	private void OnRadarTabPressed(object? sender, PointerPressedEventArgs e)
-	{ }
+	{
+		SelectTab(MainConsoleTab.Radar);
+	}
 
 	private void OnAmFmTabPressed(object? sender, PointerPressedEventArgs e)
-	{ }
+	{
+		SelectTab(MainConsoleTab.AmFm);
+	}
 
 	private void OnCadTabPressed(object? sender, PointerPressedEventArgs e)
-	{ }
+	{
+		SelectTab(MainConsoleTab.Cad);
+	}
 
 	private void OnCameraTabPressed(object? sender, PointerPressedEventArgs e)
-	{ }
+	{
+		SelectTab(MainConsoleTab.Camera);
+	}
 
 	private void OnProximityChannel1Pressed(object? sender, PointerPressedEventArgs e)
 	{ }
@@ -135,4 +149,9 @@ public partial class MainWindow : Window
 
 	private void OnAmFmMutePressed(object? sender, PointerPressedEventArgs e)
 	{ }
+
+	private void SelectTab(MainConsoleTab tab)
+	{
+		_viewModel.SelectTab(tab);
+	}
 }

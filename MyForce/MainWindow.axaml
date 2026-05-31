@@ -353,55 +353,100 @@
                           Height="66"
                           ColumnDefinitions="125,125,125,125,125,125,131"
                           ColumnSpacing="6">
-                        <Border Grid.Column="0" Classes="buttonFrame active" Width="125" Height="58" VerticalAlignment="Top" PointerPressed="OnPatrolTabPressed">
-                            <!-- Dashboard Tab Button -->
-                            <Viewbox Stretch="Uniform">
-                                <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="PATROL" />
-                            </Viewbox>
-                        </Border>
-                        <Border Grid.Column="1" Classes="buttonFrame" Width="125" Height="58" VerticalAlignment="Top" PointerPressed="OnLightsAndSirensTabPressed">
-                            <!-- Lights and Sirens Tab Button -->
-                            <Viewbox Stretch="Uniform">
-                                <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="L / S" />
-                            </Viewbox>
-                        </Border>
-                        <Border Grid.Column="2" Classes="buttonFrame" Width="125" Height="58" VerticalAlignment="Top" PointerPressed="OnRadioTabPressed">
-                            <!-- RADIO Tab Button -->
-                            <Viewbox Stretch="Uniform">
-                                <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="RADIO" />
-                            </Viewbox>
-                        </Border>
-                        <Border Grid.Column="3" Classes="buttonFrame" Width="125" Height="58" VerticalAlignment="Top" PointerPressed="OnRadarTabPressed">
-                            <!-- RADAR Tab Button -->
-                            <Viewbox Stretch="Uniform">
-                                <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="RADAR" />
-                            </Viewbox>
-                        </Border>
-                        <Border Grid.Column="4" Classes="buttonFrame" Width="125" Height="58" VerticalAlignment="Top" PointerPressed="OnAmFmTabPressed">
-                            <!-- AM/FM Tab Button -->
-                            <Viewbox Stretch="Uniform">
-                                <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="AM/FM" />
-                            </Viewbox>
-                        </Border>
-                        <Border Grid.Column="5" Classes="buttonFrame" Width="125" VerticalAlignment="Top" PointerPressed="OnCadTabPressed">
-                            <!-- CAD Tab Button -->
-                            <Viewbox Width="125" Height="53" Stretch="Uniform">
-                                <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="CAD" />
-                            </Viewbox>
-                        </Border>
-                        <Border Grid.Column="6" Classes="buttonFrame" Width="131" Height="58" VerticalAlignment="Top" PointerPressed="OnCameraTabPressed">
-                            <!-- Camera Tab Button -->
-                            <Viewbox Stretch="Uniform">
-                                <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="CAMERA" />
-                            </Viewbox>
-                        </Border>
+                        <Grid Grid.Column="0">
+                            <Border Classes="buttonFrame" Width="125" Height="58" VerticalAlignment="Top" PointerPressed="OnPatrolTabPressed" IsVisible="{Binding !IsPatrolTabSelected}">
+                                <Viewbox Stretch="Uniform">
+                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="PATROL" />
+                                </Viewbox>
+                            </Border>
+                            <Border Classes="buttonFrame active" Width="125" Height="58" VerticalAlignment="Top" PointerPressed="OnPatrolTabPressed" IsVisible="{Binding IsPatrolTabSelected}">
+                                <Viewbox Stretch="Uniform">
+                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="PATROL" />
+                                </Viewbox>
+                            </Border>
+                        </Grid>
+                        <Grid Grid.Column="1">
+                            <Border Classes="buttonFrame" Width="125" Height="58" VerticalAlignment="Top" PointerPressed="OnLightsAndSirensTabPressed" IsVisible="{Binding !IsLightsAndSirensTabSelected}">
+                                <Viewbox Stretch="Uniform">
+                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="L / S" />
+                                </Viewbox>
+                            </Border>
+                            <Border Classes="buttonFrame active" Width="125" Height="58" VerticalAlignment="Top" PointerPressed="OnLightsAndSirensTabPressed" IsVisible="{Binding IsLightsAndSirensTabSelected}">
+                                <Viewbox Stretch="Uniform">
+                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="L / S" />
+                                </Viewbox>
+                            </Border>
+                        </Grid>
+                        <Grid Grid.Column="2">
+                            <Border Classes="buttonFrame" Width="125" Height="58" VerticalAlignment="Top" PointerPressed="OnRadioTabPressed" IsVisible="{Binding !IsRadioTabSelected}">
+                                <Viewbox Stretch="Uniform">
+                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="RADIO" />
+                                </Viewbox>
+                            </Border>
+                            <Border Classes="buttonFrame active" Width="125" Height="58" VerticalAlignment="Top" PointerPressed="OnRadioTabPressed" IsVisible="{Binding IsRadioTabSelected}">
+                                <Viewbox Stretch="Uniform">
+                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="RADIO" />
+                                </Viewbox>
+                            </Border>
+                        </Grid>
+                        <Grid Grid.Column="3">
+                            <Border Classes="buttonFrame" Width="125" Height="58" VerticalAlignment="Top" PointerPressed="OnRadarTabPressed" IsVisible="{Binding !IsRadarTabSelected}">
+                                <Viewbox Stretch="Uniform">
+                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="RADAR" />
+                                </Viewbox>
+                            </Border>
+                            <Border Classes="buttonFrame active" Width="125" Height="58" VerticalAlignment="Top" PointerPressed="OnRadarTabPressed" IsVisible="{Binding IsRadarTabSelected}">
+                                <Viewbox Stretch="Uniform">
+                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="RADAR" />
+                                </Viewbox>
+                            </Border>
+                        </Grid>
+                        <Grid Grid.Column="4">
+                            <Border Classes="buttonFrame" Width="125" Height="58" VerticalAlignment="Top" PointerPressed="OnAmFmTabPressed" IsVisible="{Binding !IsAmFmTabSelected}">
+                                <Viewbox Stretch="Uniform">
+                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="AM/FM" />
+                                </Viewbox>
+                            </Border>
+                            <Border Classes="buttonFrame active" Width="125" Height="58" VerticalAlignment="Top" PointerPressed="OnAmFmTabPressed" IsVisible="{Binding IsAmFmTabSelected}">
+                                <Viewbox Stretch="Uniform">
+                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="AM/FM" />
+                                </Viewbox>
+                            </Border>
+                        </Grid>
+                        <Grid Grid.Column="5">
+                            <Border Classes="buttonFrame" Width="125" VerticalAlignment="Top" PointerPressed="OnCadTabPressed" IsVisible="{Binding !IsCadTabSelected}">
+                                <Viewbox Width="125" Height="53" Stretch="Uniform">
+                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="CAD" />
+                                </Viewbox>
+                            </Border>
+                            <Border Classes="buttonFrame active" Width="125" VerticalAlignment="Top" PointerPressed="OnCadTabPressed" IsVisible="{Binding IsCadTabSelected}">
+                                <Viewbox Width="125" Height="53" Stretch="Uniform">
+                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="CAD" />
+                                </Viewbox>
+                            </Border>
+                        </Grid>
+                        <Grid Grid.Column="6">
+                            <Border Classes="buttonFrame" Width="131" Height="58" VerticalAlignment="Top" PointerPressed="OnCameraTabPressed" IsVisible="{Binding !IsCameraTabSelected}">
+                                <Viewbox Stretch="Uniform">
+                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="CAMERA" />
+                                </Viewbox>
+                            </Border>
+                            <Border Classes="buttonFrame active" Width="131" Height="58" VerticalAlignment="Top" PointerPressed="OnCameraTabPressed" IsVisible="{Binding IsCameraTabSelected}">
+                                <Viewbox Stretch="Uniform">
+                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="CAMERA" />
+                                </Viewbox>
+                            </Border>
+                        </Grid>
                     </Grid>
 
                     <Grid Grid.Row="1"
                           Width="916"
-                          Height="637"
-                          ColumnDefinitions="322,578"
-                          ColumnSpacing="10">
+                          Height="637">
+                        <Grid Width="916"
+                              Height="637"
+                              IsVisible="{Binding IsPatrolContentVisible}"
+                              ColumnDefinitions="322,578"
+                              ColumnSpacing="10">
                         <Border Grid.Column="0" Classes="panel" Width="322" Height="637" Padding="8">
                             <Grid Width="304"
                                   Height="619"
@@ -680,6 +725,121 @@
                                 </Border>
                             </Grid>
                         </Grid>
+                        </Grid>
+
+                        <Border Classes="panel"
+                                Width="916"
+                                Height="637"
+                                IsVisible="{Binding IsLightsAndSirensContentVisible}"
+                                Padding="24">
+                            <Grid RowDefinitions="Auto,*"
+                                  RowSpacing="16">
+                                <TextBlock Classes="white"
+                                           FontSize="32"
+                                           Text="LIGHTS / SIRENS" />
+                                <TextBlock Grid.Row="1"
+                                           Classes="white"
+                                           FontSize="22"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Center"
+                                           Text="Lights and siren tab content coming next." />
+                            </Grid>
+                        </Border>
+
+                        <Border Classes="panel"
+                                Width="916"
+                                Height="637"
+                                IsVisible="{Binding IsRadioContentVisible}"
+                                Padding="24">
+                            <Grid RowDefinitions="Auto,*"
+                                  RowSpacing="16">
+                                <TextBlock Classes="white"
+                                           FontSize="32"
+                                           Text="RADIO" />
+                                <TextBlock Grid.Row="1"
+                                           Classes="white"
+                                           FontSize="22"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Center"
+                                           Text="Radio tab content coming next." />
+                            </Grid>
+                        </Border>
+
+                        <Border Classes="panel"
+                                Width="916"
+                                Height="637"
+                                IsVisible="{Binding IsRadarContentVisible}"
+                                Padding="24">
+                            <Grid RowDefinitions="Auto,*"
+                                  RowSpacing="16">
+                                <TextBlock Classes="white"
+                                           FontSize="32"
+                                           Text="RADAR" />
+                                <TextBlock Grid.Row="1"
+                                           Classes="white"
+                                           FontSize="22"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Center"
+                                           Text="Radar tab content coming next." />
+                            </Grid>
+                        </Border>
+
+                        <Border Classes="panel"
+                                Width="916"
+                                Height="637"
+                                IsVisible="{Binding IsAmFmContentVisible}"
+                                Padding="24">
+                            <Grid RowDefinitions="Auto,*"
+                                  RowSpacing="16">
+                                <TextBlock Classes="white"
+                                           FontSize="32"
+                                           Text="AM / FM" />
+                                <TextBlock Grid.Row="1"
+                                           Classes="white"
+                                           FontSize="22"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Center"
+                                           Text="AM / FM tab content coming next." />
+                            </Grid>
+                        </Border>
+
+                        <Border Classes="panel"
+                                Width="916"
+                                Height="637"
+                                IsVisible="{Binding IsCadContentVisible}"
+                                Padding="24">
+                            <Grid RowDefinitions="Auto,*"
+                                  RowSpacing="16">
+                                <TextBlock Classes="white"
+                                           FontSize="32"
+                                           Text="CAD" />
+                                <TextBlock Grid.Row="1"
+                                           Classes="white"
+                                           FontSize="22"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Center"
+                                           Text="CAD tab content coming next." />
+                            </Grid>
+                        </Border>
+
+                        <Border Classes="panel"
+                                Width="916"
+                                Height="637"
+                                IsVisible="{Binding IsCameraContentVisible}"
+                                Padding="24">
+                            <Grid RowDefinitions="Auto,*"
+                                  RowSpacing="16">
+                                <TextBlock Classes="white"
+                                           FontSize="32"
+                                           Text="CAMERA" />
+                                <TextBlock Grid.Row="1"
+                                           Classes="white"
+                                           FontSize="22"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Center"
+                                           Text="Camera tab content coming next." />
+                            </Grid>
+                        </Border>
                     </Grid>
                 </Grid>
             </Border>
