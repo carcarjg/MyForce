@@ -116,6 +116,8 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
 	{
      ObjectDisposedException.ThrowIf(_isDisposed, this);
 
+		Console.WriteLine($"[{_serviceName}] MQTT configured for {GetEndpointLabel()} using {GetTransportLabel()}.");
+
 		var optionsBuilder = new MqttClientOptionsBuilder()
 			.WithProtocolVersion(MqttProtocolVersion.V500)
 			.WithClientId(_options.ClientId)
@@ -272,7 +274,7 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
 
  private async Task OnConnectedAsync(MqttClientConnectedEventArgs arg)
 	{
-		Console.WriteLine($"[{_serviceName}] Connected to MQTT broker at {_options.Host}:{_options.Port}.");
+		Console.WriteLine($"[{_serviceName}] Connected to MQTT broker at {GetEndpointLabel()} using {GetTransportLabel()} with client id '{_options.ClientId}'.");
 
 		if (_connectedHandler is null)
 		{
@@ -295,7 +297,7 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
 	private Task OnDisconnectedAsync(MqttClientDisconnectedEventArgs arg)
 	{
 		var detail = arg.Exception?.Message ?? arg.ReasonString ?? "Disconnected.";
-		Console.WriteLine($"[{_serviceName}] MQTT disconnected: {detail}");
+		Console.WriteLine($"[{_serviceName}] MQTT disconnected from {GetEndpointLabel()}: {detail}");
       StartReconnectLoop();
 		return Task.CompletedTask;
 	}
@@ -333,7 +335,7 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
 		}
 		catch (Exception ex)
 		{
-			Console.WriteLine($"[{_serviceName}] Initial MQTT connect failed: {ex.Message}");
+			Console.WriteLine($"[{_serviceName}] Initial MQTT connect failed for {GetEndpointLabel()} using {GetTransportLabel()} with client id '{_options.ClientId}': {ex.Message}");
 		}
 	}
 
@@ -365,7 +367,7 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
 				try
 				{
 					ArgumentNullException.ThrowIfNull(_clientOptions);
-					Console.WriteLine($"[{_serviceName}] Attempting MQTT reconnect.");
+					Console.WriteLine($"[{_serviceName}] Attempting MQTT reconnect to {GetEndpointLabel()} using {GetTransportLabel()} with client id '{_options.ClientId}'.");
 					await _client.ConnectAsync(_clientOptions, _lifetimeCancellationTokenSource.Token).ConfigureAwait(false);
 					return;
 				}
@@ -375,7 +377,7 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
 				}
 				catch (Exception ex)
 				{
-					Console.WriteLine($"[{_serviceName}] MQTT reconnect failed: {ex.Message}");
+					Console.WriteLine($"[{_serviceName}] MQTT reconnect failed for {GetEndpointLabel()} using {GetTransportLabel()} with client id '{_options.ClientId}': {ex.Message}");
 				}
 
 				await Task.Delay(TimeSpan.FromSeconds(1), _lifetimeCancellationTokenSource.Token).ConfigureAwait(false);
@@ -397,6 +399,16 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
 				StartReconnectLoop();
 			}
 		}
+	}
+
+	private string GetEndpointLabel()
+	{
+		return $"{_options.Host}:{_options.Port}";
+	}
+
+	private string GetTransportLabel()
+	{
+		return _options.UseTls ? "encrypted MQTT" : "unencrypted MQTT";
 	}
 }
 
@@ -1092,7 +1104,7 @@ internal sealed record MqttServiceOptions(
 			Host: Environment.GetEnvironmentVariable("MYFORCE_MQTT_HOST") ?? "127.0.0.1",
 			Port: int.TryParse(Environment.GetEnvironmentVariable("MYFORCE_MQTT_PORT"), out var port) ? port : 1883,
 			ClientId: string.IsNullOrWhiteSpace(clientId) ? $"myforce-{normalizedServiceName}-{Environment.MachineName}" : clientId,
-			UseTls: bool.TryParse(Environment.GetEnvironmentVariable("MYFORCE_MQTT_TLS"), out var useTls) && useTls,
+			UseTls: false,
 			Username: Environment.GetEnvironmentVariable("MYFORCE_MQTT_USERNAME"),
 			Password: Environment.GetEnvironmentVariable("MYFORCE_MQTT_PASSWORD"));
 	}

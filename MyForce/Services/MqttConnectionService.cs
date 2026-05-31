@@ -56,6 +56,7 @@ internal sealed class MqttConnectionService : IDisposable
 
         var endpoint = $"{settings.Host}:{settings.Port}";
         UpdateState(new MqttConnectionState(false, "CONNECTING", endpoint, "Connecting to broker..."));
+        settings = settings with { UseTls = false };
 
         var optionsBuilder = new MqttClientOptionsBuilder()
             .WithProtocolVersion(MqttProtocolVersion.V500)

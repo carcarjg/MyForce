@@ -1220,6 +1220,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		await _mqttConnectionService.SubscribeAsync(AudioProcessorStatusTopic).ConfigureAwait(false);
 		await _mqttConnectionService.SubscribeAsync(GpioControllerStatusTopic).ConfigureAwait(false);
 		await _mqttConnectionService.SubscribeAsync(SirenInterfaceStatusTopic).ConfigureAwait(false);
+		RestoreEntertainmentModePlayback();
 	}
 
 	private void OnClockTimerTick(object? sender, EventArgs e)
@@ -1273,6 +1274,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		if (state.IsConnected)
 		{
 			UpdateSystemComponentStatus("ui", AdminComponentStatus.Online, "Local console is connected to the MQTT broker.", "LOCAL");
+			RestoreEntertainmentModePlayback();
 			return;
 		}
 
@@ -1389,6 +1391,15 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 			MapEntertainmentVolumeToGain(_amFmVolume));
 		var payload = JsonSerializer.Serialize(command, MqttJsonSerializerOptions);
 		_ = _mqttConnectionService.PublishAsync(AudioProcessorChannelGainCommandTopic, payload);
+	}
+
+	/// <summary>
+	/// Restores the saved entertainment playback state after MQTT becomes available.
+	/// </summary>
+	private void RestoreEntertainmentModePlayback()
+	{
+		PublishEntertainmentVolumeCommand();
+		SyncInternetRadioPlaybackAsync();
 	}
 
 	/// <summary>
