@@ -1,5 +1,5 @@
 using System;
-using System.Buffers;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using MQTTnet;
@@ -12,8 +12,13 @@ internal sealed class MqttConnectionService : IDisposable
 {
     private readonly IMqttClient _mqttClient;
     private readonly Lock _syncRoot = new();
+    private readonly CancellationTokenSource _lifetimeCancellationTokenSource = new();
+    private readonly HashSet<string> _subscriptions = new(StringComparer.OrdinalIgnoreCase);
     private MqttConnectionState _currentState;
+    private MqttClientOptions? _clientOptions;
+    private Task? _reconnectTask;
     private bool _isDisposed;
+    private bool _isReconnectLoopRunning;
 
     public MqttConnectionService()
     {
@@ -70,9 +75,11 @@ internal sealed class MqttConnectionService : IDisposable
             });
         }
 
+        _clientOptions = optionsBuilder.Build();
+
         try
         {
-            await _mqttClient.ConnectAsync(optionsBuilder.Build(), cancellationToken).ConfigureAwait(false);
+            await _mqttClient.ConnectAsync(_clientOptions, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -83,6 +90,8 @@ internal sealed class MqttConnectionService : IDisposable
         {
             UpdateState(CreateDisconnectedState(ex.Message, endpoint));
         }
+
+        StartReconnectLoop();
     }
 
     /// <summary>
@@ -93,11 +102,19 @@ internal sealed class MqttConnectionService : IDisposable
         ObjectDisposedException.ThrowIf(_isDisposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(topicFilter);
 
-        var subscribeOptions = new MqttClientSubscribeOptionsBuilder()
-            .WithTopicFilter(topicFilter)
-            .Build();
+        lock (_syncRoot)
+        {
+            _subscriptions.Add(topicFilter);
+        }
 
-        await _mqttClient.SubscribeAsync(subscribeOptions, cancellationToken).ConfigureAwait(false);
+        if (!_mqttClient.IsConnected)
+        {
+            var endpoint = CurrentState.Endpoint;
+            UpdateState(CreateDisconnectedState("Broker offline. Subscription will resume after reconnect.", endpoint));
+            return;
+        }
+
+        await SubscribeCoreAsync(topicFilter, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -108,42 +125,87 @@ internal sealed class MqttConnectionService : IDisposable
         ObjectDisposedException.ThrowIf(_isDisposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(topic);
 
+        if (!_mqttClient.IsConnected)
+        {
+            var endpoint = CurrentState.Endpoint;
+            UpdateState(CreateDisconnectedState("Broker offline. Command was not published.", endpoint));
+            return;
+        }
+
         var message = new MqttApplicationMessageBuilder()
             .WithTopic(topic)
             .WithPayload(payload)
             .WithRetainFlag(retain)
             .Build();
 
-        await _mqttClient.PublishAsync(message, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await _mqttClient.PublishAsync(message, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            UpdateState(CreateDisconnectedState(ex.Message, CurrentState.Endpoint));
+        }
     }
 
-   public void Dispose()
+    public void Dispose()
     {
-        if (_isDisposed)
+        Task? reconnectTask;
+
+        lock (_syncRoot)
         {
-            return;
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            _isDisposed = true;
+            reconnectTask = _reconnectTask;
         }
 
-        _isDisposed = true;
+        _lifetimeCancellationTokenSource.Cancel();
+
         _mqttClient.ConnectedAsync -= OnConnectedAsync;
         _mqttClient.DisconnectedAsync -= OnDisconnectedAsync;
         _mqttClient.ApplicationMessageReceivedAsync -= OnApplicationMessageReceivedAsync;
 
+        if (reconnectTask is not null)
+        {
+            try
+            {
+                reconnectTask.GetAwaiter().GetResult();
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        if (_mqttClient.IsConnected)
+        {
+            _mqttClient.DisconnectAsync().GetAwaiter().GetResult();
+        }
+
         _mqttClient.Dispose();
+        _lifetimeCancellationTokenSource.Dispose();
     }
 
-    private Task OnConnectedAsync(MqttClientConnectedEventArgs arg)
+    private async Task OnConnectedAsync(MqttClientConnectedEventArgs arg)
     {
         var endpoint = CurrentState.Endpoint;
         UpdateState(new MqttConnectionState(true, "ONLINE", endpoint, "Broker connected."));
-        return Task.CompletedTask;
+        await ResubscribeAsync().ConfigureAwait(false);
     }
 
     private Task OnDisconnectedAsync(MqttClientDisconnectedEventArgs arg)
     {
         var endpoint = CurrentState.Endpoint;
-        var detail = arg.Exception?.Message ?? "Broker disconnected.";
+        var detail = arg.Exception?.Message ?? arg.ReasonString ?? "Broker disconnected.";
         UpdateState(CreateDisconnectedState(detail, endpoint));
+        StartReconnectLoop();
         return Task.CompletedTask;
     }
 
@@ -151,6 +213,103 @@ internal sealed class MqttConnectionService : IDisposable
     {
         MessageReceived?.Invoke(this, arg.ApplicationMessage);
         return Task.CompletedTask;
+    }
+
+    private async Task SubscribeCoreAsync(string topicFilter, CancellationToken cancellationToken)
+    {
+        var subscribeOptions = new MqttClientSubscribeOptionsBuilder()
+            .WithTopicFilter(topicFilter)
+            .Build();
+
+        try
+        {
+            await _mqttClient.SubscribeAsync(subscribeOptions, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            UpdateState(CreateDisconnectedState(ex.Message, CurrentState.Endpoint));
+        }
+    }
+
+    private async Task ResubscribeAsync()
+    {
+        string[] subscriptions;
+
+        lock (_syncRoot)
+        {
+            subscriptions = [.. _subscriptions];
+        }
+
+        foreach (var topicFilter in subscriptions)
+        {
+            await SubscribeCoreAsync(topicFilter, _lifetimeCancellationTokenSource.Token).ConfigureAwait(false);
+        }
+    }
+
+    private void StartReconnectLoop()
+    {
+        lock (_syncRoot)
+        {
+            if (_isDisposed || _isReconnectLoopRunning || _mqttClient.IsConnected || _clientOptions is null)
+            {
+                return;
+            }
+
+            _isReconnectLoopRunning = true;
+            _reconnectTask = RunReconnectLoopAsync();
+        }
+    }
+
+    private async Task RunReconnectLoopAsync()
+    {
+        try
+        {
+            while (!_lifetimeCancellationTokenSource.IsCancellationRequested)
+            {
+                if (_mqttClient.IsConnected)
+                {
+                    return;
+                }
+
+                try
+                {
+                    ArgumentNullException.ThrowIfNull(_clientOptions);
+                    UpdateState(new MqttConnectionState(false, "CONNECTING", CurrentState.Endpoint, "Reconnecting to broker..."));
+                    await _mqttClient.ConnectAsync(_clientOptions, _lifetimeCancellationTokenSource.Token).ConfigureAwait(false);
+                    return;
+                }
+                catch (OperationCanceledException) when (_lifetimeCancellationTokenSource.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    UpdateState(CreateDisconnectedState(ex.Message, CurrentState.Endpoint));
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(1), _lifetimeCancellationTokenSource.Token).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) when (_lifetimeCancellationTokenSource.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            lock (_syncRoot)
+            {
+                _isReconnectLoopRunning = false;
+                _reconnectTask = null;
+            }
+
+            if (!_isDisposed && !_mqttClient.IsConnected)
+            {
+                StartReconnectLoop();
+            }
+        }
     }
 
     private void UpdateState(MqttConnectionState state)

@@ -60,9 +60,15 @@ internal sealed class AudioProcessorMqttApp : IAsyncDisposable
 internal sealed class MqttServiceRuntime : IAsyncDisposable
 {
     private readonly IMqttClient _client;
+    private readonly Lock _syncRoot = new();
+    private readonly CancellationTokenSource _lifetimeCancellationTokenSource = new();
     private readonly MqttLastWillMessage? _lastWillMessage;
     private readonly MqttServiceOptions _options;
     private readonly string _serviceName;
+    private MqttClientOptions? _clientOptions;
+    private Task? _reconnectTask;
+    private bool _isDisposed;
+    private bool _isReconnectLoopRunning;
     private Func<MqttApplicationMessageReceivedEventArgs, Task>? _messageHandler;
 
     public MqttServiceRuntime(string serviceName, MqttLastWillMessage? lastWillMessage = null)
@@ -78,6 +84,8 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
 
     public async Task ConnectAsync(CancellationToken cancellationToken)
     {
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
+
         var optionsBuilder = new MqttClientOptionsBuilder()
             .WithProtocolVersion(MqttProtocolVersion.V500)
             .WithClientId(_options.ClientId)
@@ -102,7 +110,9 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
             optionsBuilder = optionsBuilder.WithTlsOptions(static builder => builder.UseTls());
         }
 
-        await _client.ConnectAsync(optionsBuilder.Build(), cancellationToken);
+        _clientOptions = optionsBuilder.Build();
+        await TryConnectAsync(cancellationToken).ConfigureAwait(false);
+        StartReconnectLoop();
     }
 
     public void SetMessageHandler(Func<MqttApplicationMessageReceivedEventArgs, Task> messageHandler)
@@ -114,18 +124,39 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
     public async Task SubscribeAsync(string topicFilter, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(topicFilter);
+        if (!_client.IsConnected)
+        {
+            Console.WriteLine($"[{_serviceName}] Subscribe skipped while MQTT is offline: {topicFilter}");
+            return;
+        }
 
         var subscribeOptions = new MqttClientSubscribeOptionsBuilder()
             .WithTopicFilter(topicFilter)
             .Build();
 
-        await _client.SubscribeAsync(subscribeOptions, cancellationToken);
-        Console.WriteLine($"[{_serviceName}] Subscribed: {topicFilter}");
+        try
+        {
+            await _client.SubscribeAsync(subscribeOptions, cancellationToken).ConfigureAwait(false);
+            Console.WriteLine($"[{_serviceName}] Subscribed: {topicFilter}");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{_serviceName}] Subscribe failed for {topicFilter}: {ex.Message}");
+        }
     }
 
     public async Task PublishAsync(string topic, string payload, bool retain = false, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(topic);
+        if (!_client.IsConnected)
+        {
+            Console.WriteLine($"[{_serviceName}] Publish skipped while MQTT is offline: {topic}");
+            return;
+        }
 
         var message = new MqttApplicationMessageBuilder()
             .WithTopic(topic)
@@ -133,8 +164,19 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
             .WithRetainFlag(retain)
             .Build();
 
-        await _client.PublishAsync(message, cancellationToken);
-        Console.WriteLine($"[{_serviceName}] Published: {topic}");
+        try
+        {
+            await _client.PublishAsync(message, cancellationToken).ConfigureAwait(false);
+            Console.WriteLine($"[{_serviceName}] Published: {topic}");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{_serviceName}] Publish failed for {topic}: {ex.Message}");
+        }
     }
 
     public async Task RunUntilStoppedAsync(CancellationToken cancellationToken)
@@ -150,16 +192,42 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        Task? reconnectTask;
+
+        lock (_syncRoot)
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            _isDisposed = true;
+            reconnectTask = _reconnectTask;
+        }
+
+        await _lifetimeCancellationTokenSource.CancelAsync().ConfigureAwait(false);
         _client.ConnectedAsync -= OnConnectedAsync;
         _client.DisconnectedAsync -= OnDisconnectedAsync;
         _client.ApplicationMessageReceivedAsync -= OnMessageReceivedAsync;
 
+        if (reconnectTask is not null)
+        {
+            try
+            {
+                await reconnectTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
         if (_client.IsConnected)
         {
-            await _client.DisconnectAsync();
+            await _client.DisconnectAsync().ConfigureAwait(false);
         }
 
         _client.Dispose();
+        _lifetimeCancellationTokenSource.Dispose();
     }
 
     private Task OnConnectedAsync(MqttClientConnectedEventArgs arg)
@@ -172,16 +240,107 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
     {
         var detail = arg.Exception?.Message ?? arg.ReasonString ?? "Disconnected.";
         Console.WriteLine($"[{_serviceName}] MQTT disconnected: {detail}");
+        StartReconnectLoop();
         return Task.CompletedTask;
     }
 
-    private Task OnMessageReceivedAsync(MqttApplicationMessageReceivedEventArgs arg)
+    private async Task OnMessageReceivedAsync(MqttApplicationMessageReceivedEventArgs arg)
     {
         Console.WriteLine($"[{_serviceName}] Received message on topic: {arg.ApplicationMessage.Topic}");
 
-        return _messageHandler is null
-            ? Task.CompletedTask
-            : _messageHandler(arg);
+        if (_messageHandler is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _messageHandler(arg).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{_serviceName}] MQTT message handler failed: {ex.Message}");
+        }
+    }
+
+    private async Task TryConnectAsync(CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(_clientOptions);
+
+        try
+        {
+            await _client.ConnectAsync(_clientOptions, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{_serviceName}] Initial MQTT connect failed: {ex.Message}");
+        }
+    }
+
+    private void StartReconnectLoop()
+    {
+        lock (_syncRoot)
+        {
+            if (_isDisposed || _isReconnectLoopRunning || _client.IsConnected || _clientOptions is null)
+            {
+                return;
+            }
+
+            _isReconnectLoopRunning = true;
+            _reconnectTask = RunReconnectLoopAsync();
+        }
+    }
+
+    private async Task RunReconnectLoopAsync()
+    {
+        try
+        {
+            while (!_lifetimeCancellationTokenSource.IsCancellationRequested)
+            {
+                if (_client.IsConnected)
+                {
+                    return;
+                }
+
+                try
+                {
+                    ArgumentNullException.ThrowIfNull(_clientOptions);
+                    Console.WriteLine($"[{_serviceName}] Attempting MQTT reconnect.");
+                    await _client.ConnectAsync(_clientOptions, _lifetimeCancellationTokenSource.Token).ConfigureAwait(false);
+                    return;
+                }
+                catch (OperationCanceledException) when (_lifetimeCancellationTokenSource.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[{_serviceName}] MQTT reconnect failed: {ex.Message}");
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(1), _lifetimeCancellationTokenSource.Token).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) when (_lifetimeCancellationTokenSource.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            lock (_syncRoot)
+            {
+                _isReconnectLoopRunning = false;
+                _reconnectTask = null;
+            }
+
+            if (!_isDisposed && !_client.IsConnected)
+            {
+                StartReconnectLoop();
+            }
+        }
     }
 }
 
