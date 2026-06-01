@@ -1554,7 +1554,7 @@
                                                 </StackPanel>
                                             </Border>
 
-                                            <ScrollViewer MaxHeight="240"
+                                            <ScrollViewer MaxHeight="156"
                                                           HorizontalScrollBarVisibility="Disabled"
                                                           VerticalScrollBarVisibility="Auto">
                                                 <ItemsControl ItemsSource="{Binding AudioOutputDevices}">
