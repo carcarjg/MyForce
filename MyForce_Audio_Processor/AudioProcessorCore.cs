@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Text.Json;
@@ -1155,10 +1156,12 @@ internal static class AudioProcessorJson
 internal sealed class InternetRadioPlaybackController : IAsyncDisposable
 {
     private const int MaxUnexpectedLinuxRestartAttempts = 3;
+    private const int MaxProcessDiagnosticLines = 20;
     private static readonly TimeSpan UnexpectedLinuxRestartResetWindow = TimeSpan.FromSeconds(30);
 
     private readonly AudioProcessorConfigStore _configStore;
     private readonly HttpClient _httpClient;
+    private readonly ConcurrentQueue<string> _linuxPlayerDiagnostics = new();
     private Process? _externalPlayerProcess;
     private bool _isStoppingExternalPlayer;
     private IWavePlayer? _waveOut;
@@ -1413,9 +1416,14 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
         _externalPlayerProcess = launchedPlayer.Process;
         _externalPlayerProcess.EnableRaisingEvents = true;
         _externalPlayerProcess.Exited += OnExternalPlayerExited;
+        _externalPlayerProcess.ErrorDataReceived += OnExternalPlayerDiagnosticReceived;
+        _externalPlayerProcess.OutputDataReceived += OnExternalPlayerDiagnosticReceived;
+        _externalPlayerProcess.BeginErrorReadLine();
+        _externalPlayerProcess.BeginOutputReadLine();
         _activeBackend = launchedPlayer.BackendLabel;
         _linuxPlaybackStartedAtUtc = DateTimeOffset.UtcNow;
         _unexpectedLinuxRestartAttempts = 0;
+        ClearLinuxPlayerDiagnostics();
         AudioProcessorLog.Write("playback", $"Started Linux internet radio playback via {_activeBackend} (pid {_externalPlayerProcess.Id}).");
     }
 
@@ -1445,8 +1453,13 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
         _externalPlayerProcess = launchedPlayer.Process;
         _externalPlayerProcess.EnableRaisingEvents = true;
         _externalPlayerProcess.Exited += OnExternalPlayerExited;
+        _externalPlayerProcess.ErrorDataReceived += OnExternalPlayerDiagnosticReceived;
+        _externalPlayerProcess.OutputDataReceived += OnExternalPlayerDiagnosticReceived;
+        _externalPlayerProcess.BeginErrorReadLine();
+        _externalPlayerProcess.BeginOutputReadLine();
         _activeBackend = launchedPlayer.BackendLabel;
         _linuxPlaybackStartedAtUtc = DateTimeOffset.UtcNow;
+        ClearLinuxPlayerDiagnostics();
         CurrentState = CurrentState with
         {
             IsPlaying = true,
@@ -1526,6 +1539,8 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
             {
                 _isStoppingExternalPlayer = true;
                 _externalPlayerProcess.Exited -= OnExternalPlayerExited;
+                _externalPlayerProcess.ErrorDataReceived -= OnExternalPlayerDiagnosticReceived;
+                _externalPlayerProcess.OutputDataReceived -= OnExternalPlayerDiagnosticReceived;
 
                 if (!_externalPlayerProcess.HasExited)
                 {
@@ -1563,6 +1578,33 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
 
         AudioProcessorLog.Write("playback", $"Linux playback remained stable for {uptime.TotalSeconds:F0} seconds. Resetting the unexpected-exit retry counter.");
         _unexpectedLinuxRestartAttempts = 0;
+    }
+
+    private void ClearLinuxPlayerDiagnostics()
+    {
+        while (_linuxPlayerDiagnostics.TryDequeue(out _))
+        {
+        }
+    }
+
+    private void OnExternalPlayerDiagnosticReceived(object sender, DataReceivedEventArgs args)
+    {
+        if (string.IsNullOrWhiteSpace(args.Data))
+        {
+            return;
+        }
+
+        _linuxPlayerDiagnostics.Enqueue(args.Data);
+        while (_linuxPlayerDiagnostics.Count > MaxProcessDiagnosticLines && _linuxPlayerDiagnostics.TryDequeue(out _))
+        {
+        }
+    }
+
+    private string GetLinuxPlayerDiagnosticsSummary()
+    {
+        return _linuxPlayerDiagnostics.IsEmpty
+            ? "No ffplay diagnostics were captured before exit."
+            : string.Join(" | ", _linuxPlayerDiagnostics.ToArray());
     }
 
     private string GetPlaybackBackendDescription()
@@ -1606,11 +1648,14 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
 
         var exitCode = process.ExitCode;
         ResetUnexpectedLinuxRestartAttemptsIfPlaybackWasStable();
-        AudioProcessorLog.Write("playback", $"Linux internet radio player exited unexpectedly with code {exitCode}.");
+        var diagnostics = GetLinuxPlayerDiagnosticsSummary();
+        AudioProcessorLog.Write("playback", $"Linux internet radio player exited unexpectedly with code {exitCode}. Diagnostics: {diagnostics}");
 
         if (_externalPlayerProcess == process)
         {
             _externalPlayerProcess.Exited -= OnExternalPlayerExited;
+            _externalPlayerProcess.ErrorDataReceived -= OnExternalPlayerDiagnosticReceived;
+            _externalPlayerProcess.OutputDataReceived -= OnExternalPlayerDiagnosticReceived;
             _externalPlayerProcess.Dispose();
             _externalPlayerProcess = null;
             _activeBackend = null;
@@ -1726,8 +1771,8 @@ internal sealed class LinuxPlayerCandidate
             FileName = fileName,
             UseShellExecute = false,
             CreateNoWindow = true,
-            RedirectStandardError = false,
-            RedirectStandardOutput = false
+            RedirectStandardError = true,
+            RedirectStandardOutput = true
         };
     }
 }

@@ -3,7 +3,7 @@ SiiNunit
 live_stream_def : _nameless.234.2c04.5a20
 {
     stream_data: 16
-    stream_data[0]: "https://www.livestreamssii.com|Este archivo pertenece a livesstreamssii.com|Prohibida la distribución sin autorización|LEGAL|0|0"
+    stream_data[0]: "https://www.livestreamssii.com|Este archivo |Prohibida la distribución sin autorización|LEGAL|0|0"
     stream_data[1]: "http://stream.laut.fm/simulator1|Simulator1|Dance|DE|128|1"
     stream_data[2]: "http://rock-high.rautemusik.fm/Musik.Rock|RauteMusik.FM - Rock|Rock|DE|192|1"
     stream_data[3]: "https://radio.truckers.fm/|TruckersFM|Sim radio|Variety|EN|320|1"
@@ -17,7 +17,7 @@ live_stream_def : _nameless.234.2c04.5a20
     stream_data[11]: "https://metromedia.live24.gr/republicthess|Republic FM|Electronic|GR|128|1"
     stream_data[12]: "https://n13.radiojar.com/9ndpdg3c0s8uv?rj-ttl=5&rj-tok=AAABkaOvYUsAAqQP5zVE3-F1SQ|Athens Up Radio|Electronic and House|GR|128|1"
     stream_data[13]: "http://lyd.nrk.no/nrk_radio_mp3_mp3_h|NRK mP3|Electro|NO|192|1"
-    stream_data[14]: "http://nashe1.hostingradio.ru/ultra-128.mp3|Radio Ultra (\xd0\xa0\xd0\xb0\xd0\xb4\xd0\xb8\xd0\xbe \xd0\xa3\xd0\xbb\xd1\x8c\xd1\x82\xd1\x80\xd0\xb0)|Rock|RU|128|1"
+    stream_data[14]: "http://nashe1.hostingradio.ru/ultra-128.mp3|Radio Ultra|Rock|RU|128|1"
     stream_data[15]: "https://live.wtfradio.rs/wtfradio.mp3|Radio WTF|Dance, Electronic|SR|128|1"
 }
 }

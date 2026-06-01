@@ -12,7 +12,10 @@ public sealed record AmFmUiState(
 	string? BluetoothLabel,
 	string? InternetStreamUrl,
 	bool IsMuted,
-	int Volume)
+	int Volume,
+	decimal?[]? FmPresets,
+	decimal?[]? AmPresets,
+	string?[]? InternetPresets)
 {
 	/// <summary>
 	/// Gets the default local UI state used when no persisted file exists.
@@ -24,5 +27,8 @@ public sealed record AmFmUiState(
 		BluetoothLabel: "BT AUDIO",
 		InternetStreamUrl: null,
 		IsMuted: false,
-		Volume: 25);
+		Volume: 25,
+		FmPresets: Array.Empty<decimal?>(),
+		AmPresets: Array.Empty<decimal?>(),
+		InternetPresets: Array.Empty<string?>());
 }

@@ -1201,7 +1201,12 @@
                                                     Width="154"
                                                     Height="124"
                                                     IsVisible="{Binding !IsInternetChannelListButtonVisible}" />
-                                            <Border Grid.Row="1" Classes="buttonFrame" Width="154" Height="124" PointerPressed="OnAmFmChannelSetPressed">
+                                            <Border Grid.Row="1" Classes="buttonFrame" Width="154" Height="124" PointerPressed="OnAmFmChannelSetPressed" IsVisible="{Binding !IsAmFmChannelSetArmed}">
+                                                <Viewbox Stretch="Uniform">
+                                                    <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="CH&#x0a;SET" />
+                                                </Viewbox>
+                                            </Border>
+                                            <Border Grid.Row="1" Classes="buttonFrame active" Width="154" Height="124" PointerPressed="OnAmFmChannelSetPressed" IsVisible="{Binding IsAmFmChannelSetArmed}">
                                                 <Viewbox Stretch="Uniform">
                                                     <TextBlock Classes="white" TextAlignment="Center" VerticalAlignment="Center" Text="CH&#x0a;SET" />
                                                 </Viewbox>

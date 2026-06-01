@@ -119,7 +119,7 @@ public enum AuxiliaryAudioSourceMode
 
 public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 {
-	private static readonly decimal[] AmFmPresetStations = [88.1m, 88.1m, 88.1m, 88.1m, 88.1m, 88.1m];
+	private const int PresetCount = 6;
 	private const string AdminPinCode = "2135";
 	private const string AudioProcessorStatusTopic = "myforce/ap/status/service";
 	private const string AudioProcessorChannelGainCommandTopic = "myforce/ap/cmd/channel-gain";
@@ -176,6 +176,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 	private InternetRadioStation? _selectedInternetStation;
 
 	private string _bluetoothDisplayLabel = "BT AUDIO";
+	private bool _isAmFmChannelSetArmed;
+	private decimal?[] _fmPresetStations = new decimal?[PresetCount];
+	private decimal?[] _amPresetStations = new decimal?[PresetCount];
+	private string?[] _internetPresetStationNames = new string?[PresetCount];
 
 	private IReadOnlyList<InternetRadioStation> _internetRadioStations = Array.Empty<InternetRadioStation>();
 
@@ -509,6 +513,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	public bool IsAmFmMuted => _isAmFmMuted;
 
+	public bool IsAmFmChannelSetArmed => _isAmFmChannelSetArmed;
+
 	public bool IsFm1SourceSelected => _selectedAuxiliarySourceMode == AuxiliaryAudioSourceMode.Fm1;
 
 	public bool IsAm1SourceSelected => _selectedAuxiliarySourceMode == AuxiliaryAudioSourceMode.Am1;
@@ -528,17 +534,17 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	public string AuxSourceStatusLine2 => _isAmFmMuted ? "DUCKED / MUTE" : "LIVE TO AP";
 
-	public string AmFmPreset1Label => FormatPresetLabel(AmFmPresetStations[0]);
+	public string AmFmPreset1Label => GetPresetLabel(0);
 
-	public string AmFmPreset2Label => FormatPresetLabel(AmFmPresetStations[1]);
+	public string AmFmPreset2Label => GetPresetLabel(1);
 
-	public string AmFmPreset3Label => FormatPresetLabel(AmFmPresetStations[2]);
+	public string AmFmPreset3Label => GetPresetLabel(2);
 
-	public string AmFmPreset4Label => FormatPresetLabel(AmFmPresetStations[3]);
+	public string AmFmPreset4Label => GetPresetLabel(3);
 
-	public string AmFmPreset5Label => FormatPresetLabel(AmFmPresetStations[4]);
+	public string AmFmPreset5Label => GetPresetLabel(4);
 
-	public string AmFmPreset6Label => FormatPresetLabel(AmFmPresetStations[5]);
+	public string AmFmPreset6Label => GetPresetLabel(5);
 
 	public string Radio1ChannelName
 	{
@@ -1081,6 +1087,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 	{
 		var previousMode = _selectedAuxiliarySourceMode;
 		_selectedAuxiliarySourceMode = sourceMode;
+		_isAmFmChannelSetArmed = false;
 		if (sourceMode != AuxiliaryAudioSourceMode.InternetRadio)
 		{
 			IsInternetChannelListVisible = false;
@@ -1212,7 +1219,16 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 			return;
 		}
 
+		if (IsAm1SourceSelected)
+		{
+			_amFrequency = decimal.Round(decimal.Min(_amFrequency + 0.2m, 171.0m), 1, MidpointRounding.AwayFromZero);
+			SaveAmFmUiState();
+			RaiseAmFmStateChanged();
+			return;
+		}
+
 		_amFmFrequency = decimal.Round(decimal.Min(_amFmFrequency + 0.2m, 107.9m), 1, MidpointRounding.AwayFromZero);
+		SaveAmFmUiState();
 		RaiseAmFmStateChanged();
 	}
 
@@ -1239,13 +1255,31 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	public void SeekAmFmUp()
 	{
+		if (IsAm1SourceSelected)
+		{
+			_amFrequency = decimal.Round(decimal.Min(_amFrequency + 10.0m, 171.0m), 1, MidpointRounding.AwayFromZero);
+			SaveAmFmUiState();
+			RaiseAmFmStateChanged();
+			return;
+		}
+
 		_amFmFrequency = decimal.Round(decimal.Min(_amFmFrequency + 0.5m, 107.9m), 1, MidpointRounding.AwayFromZero);
+		SaveAmFmUiState();
 		RaiseAmFmStateChanged();
 	}
 
 	public void SeekAmFmDown()
 	{
+		if (IsAm1SourceSelected)
+		{
+			_amFrequency = decimal.Round(decimal.Max(_amFrequency - 10.0m, 87.5m), 1, MidpointRounding.AwayFromZero);
+			SaveAmFmUiState();
+			RaiseAmFmStateChanged();
+			return;
+		}
+
 		_amFmFrequency = decimal.Round(decimal.Max(_amFmFrequency - 0.5m, 87.5m), 1, MidpointRounding.AwayFromZero);
+		SaveAmFmUiState();
 		RaiseAmFmStateChanged();
 	}
 
@@ -1256,7 +1290,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	public void StoreCurrentAmFmChannel()
 	{
-		_isAmFmStereoEnabled = !_isAmFmStereoEnabled;
+		if (IsBluetoothSourceSelected)
+		{
+			_isAmFmChannelSetArmed = false;
+			RaiseAmFmStateChanged();
+			return;
+		}
+
+		_isAmFmChannelSetArmed = !_isAmFmChannelSetArmed;
 		RaiseAmFmStateChanged();
 	}
 
@@ -1278,12 +1319,33 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	public void SelectAmFmPreset(int presetIndex)
 	{
-		if (presetIndex < 0 || presetIndex >= AmFmPresetStations.Length)
+		if (presetIndex < 0 || presetIndex >= PresetCount)
 		{
 			throw new ArgumentOutOfRangeException(nameof(presetIndex));
 		}
 
-		_amFmFrequency = AmFmPresetStations[presetIndex];
+		if (_isAmFmChannelSetArmed)
+		{
+			SaveCurrentPreset(presetIndex);
+			_isAmFmChannelSetArmed = false;
+			SaveAmFmUiState();
+			RaiseAmFmStateChanged();
+			return;
+		}
+
+		if (!RecallPreset(presetIndex))
+		{
+			RaiseAmFmStateChanged();
+			return;
+		}
+
+		SaveAmFmUiState();
+		if (IsInternetSourceSelected)
+		{
+			SyncInternetRadioPlaybackAsync();
+			RaiseInternetChannelListStateChanged();
+		}
+
 		RaiseAmFmStateChanged();
 	}
 
@@ -1695,6 +1757,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAmFmDetailVisible)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSeekControlsVisible)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAmFmMuted)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAmFmChannelSetArmed)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsFm1SourceSelected)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAm1SourceSelected)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsBluetoothSourceSelected)));
@@ -1730,6 +1793,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 	{
 		var streamsPath = Path.Combine(AppContext.BaseDirectory, "streams.sii");
 		_internetRadioStations = _internetRadioCatalogService.LoadCatalog(streamsPath);
+		if (ValidateInternetPresets())
+		{
+			SaveAmFmUiState();
+		}
+
 		_selectedInternetStation = _internetRadioStations.FirstOrDefault();
 		ResetInternetStationViewport(preserveSelection: false);
 		RaiseInternetChannelListStateChanged();
@@ -1766,6 +1834,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		var savedState = _amFmUiStateStore.Load();
 		_amFmFrequency = savedState.FmFrequency;
 		_amFrequency = savedState.AmFrequency;
+		_fmPresetStations = NormalizeFrequencyPresets(savedState.FmPresets);
+		_amPresetStations = NormalizeFrequencyPresets(savedState.AmPresets);
+		_internetPresetStationNames = NormalizeInternetPresets(savedState.InternetPresets);
 		_bluetoothDisplayLabel = string.IsNullOrWhiteSpace(savedState.BluetoothLabel) ? "BT AUDIO" : savedState.BluetoothLabel;
 		_isAmFmMuted = savedState.IsMuted;
 		_amFmVolume = Math.Clamp(savedState.Volume, 0, 40);
@@ -1783,6 +1854,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		}
 
 		_selectedAuxiliarySourceMode = restoredMode;
+		if (ValidateInternetPresets())
+		{
+			SaveAmFmUiState();
+		}
+
 		ResetInternetStationViewport(preserveSelection: true);
 	}
 
@@ -1798,7 +1874,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 			BluetoothLabel: _bluetoothDisplayLabel,
 			InternetStreamUrl: _selectedInternetStation?.StreamUrl,
 			IsMuted: _isAmFmMuted,
-			Volume: _amFmVolume);
+			Volume: _amFmVolume,
+			FmPresets: [.. _fmPresetStations],
+			AmPresets: [.. _amPresetStations],
+			InternetPresets: [.. _internetPresetStationNames]);
 
 		_amFmUiStateStore.Save(state);
 	}
@@ -1855,9 +1934,156 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		return values[nextIndex];
 	}
 
-	private static string FormatPresetLabel(decimal frequency)
+	private string GetPresetLabel(int presetIndex)
 	{
-		return frequency.ToString("0.0", CultureInfo.InvariantCulture);
+		return _selectedAuxiliarySourceMode switch
+		{
+			AuxiliaryAudioSourceMode.Fm1 => FormatPresetLabel(_fmPresetStations[presetIndex]),
+			AuxiliaryAudioSourceMode.Am1 => FormatPresetLabel(_amPresetStations[presetIndex]),
+			AuxiliaryAudioSourceMode.Bluetooth => string.Empty,
+			AuxiliaryAudioSourceMode.InternetRadio => _internetPresetStationNames[presetIndex] ?? string.Empty,
+			_ => throw new ArgumentOutOfRangeException(),
+		};
+	}
+
+	private void SaveCurrentPreset(int presetIndex)
+	{
+		switch (_selectedAuxiliarySourceMode)
+		{
+			case AuxiliaryAudioSourceMode.Fm1:
+				_fmPresetStations[presetIndex] = _amFmFrequency;
+				break;
+			case AuxiliaryAudioSourceMode.Am1:
+				_amPresetStations[presetIndex] = _amFrequency;
+				break;
+			case AuxiliaryAudioSourceMode.Bluetooth:
+				break;
+			case AuxiliaryAudioSourceMode.InternetRadio:
+				_internetPresetStationNames[presetIndex] = _selectedInternetStation?.DisplayName;
+				break;
+			default:
+				throw new ArgumentOutOfRangeException();
+		}
+	}
+
+	private bool RecallPreset(int presetIndex)
+	{
+		switch (_selectedAuxiliarySourceMode)
+		{
+			case AuxiliaryAudioSourceMode.Fm1:
+				if (!_fmPresetStations[presetIndex].HasValue)
+				{
+					return false;
+				}
+
+				_amFmFrequency = _fmPresetStations[presetIndex]!.Value;
+				return true;
+			case AuxiliaryAudioSourceMode.Am1:
+				if (!_amPresetStations[presetIndex].HasValue)
+				{
+					return false;
+				}
+
+				_amFrequency = _amPresetStations[presetIndex]!.Value;
+				return true;
+			case AuxiliaryAudioSourceMode.Bluetooth:
+				return false;
+			case AuxiliaryAudioSourceMode.InternetRadio:
+				return RecallInternetPreset(presetIndex);
+			default:
+				throw new ArgumentOutOfRangeException();
+		}
+	}
+
+	private bool RecallInternetPreset(int presetIndex)
+	{
+		var stationName = _internetPresetStationNames[presetIndex];
+		if (string.IsNullOrWhiteSpace(stationName))
+		{
+			return false;
+		}
+
+		var station = FindInternetStationByDisplayName(stationName);
+		if (station is null)
+		{
+			_internetPresetStationNames[presetIndex] = null;
+			SaveAmFmUiState();
+			return false;
+		}
+
+		_selectedInternetStation = station;
+		IsInternetChannelListVisible = false;
+		EnsureInternetStationVisible(FilteredInternetRadioStations.ToList().FindIndex(candidate =>
+			string.Equals(candidate.StreamUrl, station.StreamUrl, StringComparison.OrdinalIgnoreCase)));
+		return true;
+	}
+
+	private bool ValidateInternetPresets()
+	{
+		var hasChanges = false;
+		for (var presetIndex = 0; presetIndex < _internetPresetStationNames.Length; presetIndex++)
+		{
+			var stationName = _internetPresetStationNames[presetIndex];
+			if (string.IsNullOrWhiteSpace(stationName))
+			{
+				continue;
+			}
+
+			if (FindInternetStationByDisplayName(stationName) is not null)
+			{
+				continue;
+			}
+
+			_internetPresetStationNames[presetIndex] = null;
+			hasChanges = true;
+		}
+
+		return hasChanges;
+	}
+
+	private InternetRadioStation? FindInternetStationByDisplayName(string stationName)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(stationName);
+
+		return _internetRadioStations.FirstOrDefault(station =>
+			string.Equals(station.DisplayName, stationName, StringComparison.OrdinalIgnoreCase));
+	}
+
+	private static decimal?[] NormalizeFrequencyPresets(decimal?[]? presets)
+	{
+		var normalizedPresets = new decimal?[PresetCount];
+		if (presets is null)
+		{
+			return normalizedPresets;
+		}
+
+		for (var presetIndex = 0; presetIndex < Math.Min(PresetCount, presets.Length); presetIndex++)
+		{
+			normalizedPresets[presetIndex] = presets[presetIndex];
+		}
+
+		return normalizedPresets;
+	}
+
+	private static string?[] NormalizeInternetPresets(string?[]? presets)
+	{
+		var normalizedPresets = new string?[PresetCount];
+		if (presets is null)
+		{
+			return normalizedPresets;
+		}
+
+		for (var presetIndex = 0; presetIndex < Math.Min(PresetCount, presets.Length); presetIndex++)
+		{
+			normalizedPresets[presetIndex] = string.IsNullOrWhiteSpace(presets[presetIndex]) ? null : presets[presetIndex];
+		}
+
+		return normalizedPresets;
+	}
+
+	private static string FormatPresetLabel(decimal? frequency)
+	{
+		return frequency?.ToString("0.0", CultureInfo.InvariantCulture) ?? string.Empty;
 	}
 
 	private string ResolveAudioOutputSpeakerLabel(string? deviceId)
