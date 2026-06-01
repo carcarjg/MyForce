@@ -592,4 +592,8 @@ public interface IAudioProcessorStoredConfig
 	string? OutputSpeakerDeviceId { get; set; }
 
 	string? InternetRadioPlayCommandJson { get; set; }
+
+	string? RadioDefinitionsJson { get; set; }
+
+	string? RelaySetsJson { get; set; }
 }

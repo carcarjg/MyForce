@@ -12,6 +12,7 @@ internal static class InternetRadioMqttTopics
 	public const string StopCommandTopic = "myforce/ap/cmd/internet-radio/stop";
 	public const string StateTopic = "myforce/ap/state/internet-radio";
 	public const string AudioFrameworkStateTopic = "myforce/ap/state/audio-framework";
+	public const string RadioRuntimeStateTopic = "myforce/ap/state/radios";
 	public const string RoutingStateTopic = "myforce/ap/state/routing";
 	public const string SpeakerOutputCommandTopic = "myforce/ap/cmd/output-speaker";
 }
@@ -73,3 +74,66 @@ internal sealed record AudioFrameworkStateMessage(
 internal sealed record RoutingStateMessage(
 	string? ActiveOperatorTarget,
 	string SpeakerDeviceId);
+
+/// <summary>
+/// Represents the retained AP radio runtime payload used for schema-driven admin integration.
+/// </summary>
+public sealed record RadioRuntimeStateMessage(
+	IReadOnlyList<RadioRuntimeEntryMessage> Radios);
+
+/// <summary>
+/// Represents one radio entry from the retained AP radio runtime payload.
+/// </summary>
+public sealed record RadioRuntimeEntryMessage(
+	string RadioId,
+	string TypeId,
+	string DisplayName,
+	string Kind,
+	RadioCapabilitiesMessage Capabilities,
+	string ConfigSchema,
+	string InstanceSchema,
+	RadioInstanceConfigMessage Config,
+	RadioTxStateMessage TxState);
+
+public sealed record RadioCapabilitiesMessage(
+	IReadOnlyList<string> Keying,
+	IReadOnlyList<string> Detect,
+	bool ProvidesAudio,
+	IReadOnlyList<string> Controls);
+
+public sealed record RadioInstanceConfigMessage(
+	RadioKeyingConfigMessage Keying,
+	RadioDetectConfigMessage Detect,
+	RadioDeviceBindingMessage? Device);
+
+public sealed record RadioKeyingConfigMessage(
+	string Method,
+	RadioRelayBindingMessage? Relay,
+	int PttLeadMs,
+	int PttTailMs,
+	bool TalkPermit);
+
+public sealed record RadioRelayBindingMessage(
+	string RelaySet,
+	int Channel);
+
+public sealed record RadioDetectConfigMessage(
+	string Method,
+	RadioVoxConfigMessage? Vox);
+
+public sealed record RadioVoxConfigMessage(
+	double ThresholdDb,
+	int AttackMs,
+	int HangMs);
+
+public sealed record RadioDeviceBindingMessage(
+	string? Soundcard);
+
+public sealed record RadioTxStateMessage(
+	string Phase,
+	bool IsKeyAsserted,
+	bool IsTalkPermitReady,
+	string KeyingMethod,
+	int PttLeadMs,
+	int PttTailMs,
+	DateTimeOffset LastTransitionUtc);

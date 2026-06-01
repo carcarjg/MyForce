@@ -288,6 +288,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	private IReadOnlyList<AudioDeviceStateMessage> _audioOutputDevices = Array.Empty<AudioDeviceStateMessage>();
 
+	private IReadOnlyList<RadioRuntimeEntryMessage> _radioRuntimeEntries = Array.Empty<RadioRuntimeEntryMessage>();
+
 	private string _apConfiguredOutputSpeakerId = DefaultAudioOutputSpeakerId;
 
 	private string _selectedAdminOutputSpeakerId = DefaultAudioOutputSpeakerId;
@@ -832,6 +834,22 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		private set => SetProperty(ref _audioOutputDevices, value);
 	}
 
+	public IReadOnlyList<RadioRuntimeEntryMessage> RadioRuntimeEntries
+	{
+		get => _radioRuntimeEntries;
+		private set => SetProperty(ref _radioRuntimeEntries, value);
+	}
+
+	public int AdminRadioEntryCount => RadioRuntimeEntries.Count;
+
+	public bool HasAdminRadioEntries => AdminRadioEntryCount > 0;
+
+	public bool IsAdminRadioSectionSelected => SelectedAdminSection == AdminSection.Radio;
+
+	public string AdminRadioSummary => HasAdminRadioEntries
+		? $"RADIOS: {AdminRadioEntryCount}  MODULES: {RadioRuntimeEntries.Count(static radio => string.Equals(radio.Kind, "Module", StringComparison.OrdinalIgnoreCase) || string.Equals(radio.Kind, "AdvancedModule", StringComparison.OrdinalIgnoreCase))}  RESOURCES: {RadioRuntimeEntries.Count(static radio => string.Equals(radio.Kind, "Resource", StringComparison.OrdinalIgnoreCase))}"
+		: "Waiting for retained AP radio runtime data.";
+
 	public bool IsAdminAudioSectionSelected => SelectedAdminSection == AdminSection.Audio;
 
 	public bool IsAdminNetworkSectionSelected => SelectedAdminSection == AdminSection.Network;
@@ -900,7 +918,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	public bool IsAdminSystemStatusSectionSelected => SelectedAdminSection == AdminSection.SystemStatus;
 
-	public bool IsAdminNonSystemSectionSelected => SelectedAdminSection is not (AdminSection.System or AdminSection.SystemStatus or AdminSection.Audio or AdminSection.Integrations or AdminSection.IntegrationsWhat3Words);
+	public bool IsAdminNonSystemSectionSelected => SelectedAdminSection is not (AdminSection.System or AdminSection.SystemStatus or AdminSection.Audio or AdminSection.Radio or AdminSection.Integrations or AdminSection.IntegrationsWhat3Words);
 
 	// Indicates whether the left directional button is active.
 	public bool IsDirectionalLeftSelected => SelectedDirectional == DirectionalMode.Left;
@@ -1541,6 +1559,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		await _mqttConnectionService.ConnectAsync(settings).ConfigureAwait(false);
 		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.StateTopic).ConfigureAwait(false);
 		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.AudioFrameworkStateTopic).ConfigureAwait(false);
+		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.RadioRuntimeStateTopic).ConfigureAwait(false);
 		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.RoutingStateTopic).ConfigureAwait(false);
 		await _mqttConnectionService.SubscribeAsync(AudioProcessorStatusTopic).ConfigureAwait(false);
 		await _mqttConnectionService.SubscribeAsync(GpioControllerStatusTopic).ConfigureAwait(false);
@@ -1597,6 +1616,24 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 			return;
 		}
 
+		if (string.Equals(message.Topic, InternetRadioMqttTopics.RadioRuntimeStateTopic, StringComparison.OrdinalIgnoreCase))
+		{
+			var radioRuntimePayload = message.ConvertPayloadToString();
+			if (string.IsNullOrWhiteSpace(radioRuntimePayload))
+			{
+				return;
+			}
+
+			var radioRuntime = JsonSerializer.Deserialize<RadioRuntimeStateMessage>(radioRuntimePayload, MqttJsonSerializerOptions);
+			if (radioRuntime is null)
+			{
+				return;
+			}
+
+			Dispatcher.UIThread.Post(() => ApplyRadioRuntimeState(radioRuntime));
+			return;
+		}
+
 		if (string.Equals(message.Topic, AudioProcessorStatusTopic, StringComparison.OrdinalIgnoreCase)
 			|| string.Equals(message.Topic, GpioControllerStatusTopic, StringComparison.OrdinalIgnoreCase)
 			|| string.Equals(message.Topic, SirenInterfaceStatusTopic, StringComparison.OrdinalIgnoreCase))
@@ -1624,6 +1661,16 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		}
 
 		Dispatcher.UIThread.Post(() => ApplyInternetRadioPlaybackState(state));
+	}
+
+	/// <summary>
+	/// Applies the retained AP radio runtime metadata for future schema-driven admin rendering.
+	/// </summary>
+	private void ApplyRadioRuntimeState(RadioRuntimeStateMessage state)
+	{
+		ArgumentNullException.ThrowIfNull(state);
+		RadioRuntimeEntries = state.Radios ?? Array.Empty<RadioRuntimeEntryMessage>();
+		RaiseAdminNetworkStateChanged();
 	}
 
 	private void ApplyMqttState(MqttConnectionState state)
@@ -1881,6 +1928,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAdminSystemGeneralSectionSelected)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAdminSystemStatusSectionSelected)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAdminAudioSectionSelected)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAdminRadioSectionSelected)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAdminNetworkSectionSelected)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAdminIntegrationsSectionSelected)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAdminIntegrationsWhat3WordsSectionSelected)));
@@ -1903,6 +1951,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	private void RaiseAdminNetworkStateChanged()
 	{
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RadioRuntimeEntries)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AdminRadioEntryCount)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasAdminRadioEntries)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AdminRadioSummary)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAdminRadioSectionSelected)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAdminNetworkSectionSelected)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAdminIntegrationsSectionSelected)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsAdminIntegrationsWhat3WordsSectionSelected)));

@@ -16,14 +16,17 @@
 // Copyright (C) 2025-2026 NyxTel Wireless / Nyx Gallini
 //
 using System.Buffers;
+using System.Runtime.Loader;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using MQTTnet;
 using NAudio.Wave;
+using MyForce.Contracts.Radio;
 
 internal sealed class AudioProcessorCoordinator : IAsyncDisposable
 {
@@ -45,6 +48,10 @@ internal sealed class AudioProcessorCoordinator : IAsyncDisposable
 
 	private readonly TxController _txController;
 
+	private readonly RadioPluginCatalog _pluginCatalog;
+
+	private readonly AudioProcessorPersistedTopology _persistedTopology;
+
 	public AudioProcessorCoordinator(MqttServiceRuntime mqttRuntime, AudioProcessorTopicFactory topics)
 	{
 		ArgumentNullException.ThrowIfNull(mqttRuntime);
@@ -53,14 +60,18 @@ internal sealed class AudioProcessorCoordinator : IAsyncDisposable
 		_mqttRuntime = mqttRuntime;
 		_topics = topics;
 		_configStore = new AudioProcessorConfigStore();
+		_pluginCatalog = RadioPluginCatalog.Load(AudioProcessorPluginDirectory.Resolve(), AudioProcessorLog.Write);
+		_persistedTopology = AudioProcessorPersistedTopology.Load(_configStore.StoredConfig);
 		_registry = AudioProcessorRegistry.CreateDefault();
 		_audioFramework = AudioFrameworkCatalog.CreateDefault(_registry.RadioIds, AudioFrameworkCatalog.DiscoverPlaybackDevices());
 		_internetRadioController = new InternetRadioPlaybackController(_configStore);
 		_mixerState = AudioMixerState.CreateDefault(_audioFramework.ChannelStrips);
 		_routingState = AudioProcessorRoutingState.CreateDefault(_registry.RadioIds, ResolveInitialSpeakerDeviceId());
-		_txController = new TxController(_registry.RadioIds);
+		_txController = new TxController(_registry.Radios);
 		_internetRadioController.SetOutputSpeaker(_routingState.CurrentSnapshot.SpeakerSink.DeviceId);
 		AudioProcessorLog.Write("discovery", $"Audio framework initialized with {_audioFramework.Devices.Count(device => device.OutputEnabled && string.Equals(device.Role, "speaker", StringComparison.OrdinalIgnoreCase))} output speaker device(s).");
+		AudioProcessorLog.Write("discovery", $"Discovered {_pluginCatalog.Modules.Count} radio plugin type(s) from '{_pluginCatalog.PluginDirectoryPath}'.");
+		AudioProcessorLog.Write("config", $"Loaded {_persistedTopology.RadioDefinitions.Count} persisted radio definition(s) and {_persistedTopology.RelaySets.Count} relay set definition(s).");
 	}
 
 	public async Task StartAsync(CancellationToken cancellationToken)
@@ -69,6 +80,163 @@ internal sealed class AudioProcessorCoordinator : IAsyncDisposable
 		await RestoreInternetRadioPlaybackAsync(cancellationToken).ConfigureAwait(false);
 		await PublishBirthSnapshotAsync(cancellationToken).ConfigureAwait(false);
 	}
+
+internal static class AudioProcessorPluginDirectory
+{
+	private const string PluginDirectoryName = "plugins";
+
+	public static string Resolve()
+	{
+		var configuredPath = Environment.GetEnvironmentVariable("MYFORCE_AUDIO_PROCESSOR_PLUGIN_PATH");
+		if (!string.IsNullOrWhiteSpace(configuredPath))
+		{
+			return Path.GetFullPath(configuredPath);
+		}
+
+		return Path.Combine(AppContext.BaseDirectory, PluginDirectoryName);
+	}
+}
+
+internal sealed class RadioPluginCatalog
+{
+	private RadioPluginCatalog(string pluginDirectoryPath, IReadOnlyList<DiscoveredRadioModule> modules)
+	{
+		PluginDirectoryPath = pluginDirectoryPath;
+		Modules = modules;
+	}
+
+	public string PluginDirectoryPath { get; }
+
+	public IReadOnlyList<DiscoveredRadioModule> Modules { get; }
+
+	public static RadioPluginCatalog Load(string pluginDirectoryPath, Action<string, string> log)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(pluginDirectoryPath);
+		ArgumentNullException.ThrowIfNull(log);
+
+		Directory.CreateDirectory(pluginDirectoryPath);
+		var modules = new List<DiscoveredRadioModule>();
+		foreach (var assemblyPath in Directory.EnumerateFiles(pluginDirectoryPath, "*.dll", SearchOption.TopDirectoryOnly))
+		{
+			try
+			{
+				var loadContext = new AssemblyLoadContext($"radio-plugin:{Path.GetFileNameWithoutExtension(assemblyPath)}", isCollectible: true);
+				var assembly = loadContext.LoadFromAssemblyPath(assemblyPath);
+				var factoryType = assembly
+					.GetTypes()
+					.FirstOrDefault(type => !type.IsAbstract && typeof(IRadioModuleFactory).IsAssignableFrom(type));
+
+				if (factoryType is null)
+				{
+					log("discovery", $"Skipped plugin '{assemblyPath}' because it did not expose an {nameof(IRadioModuleFactory)} implementation.");
+					loadContext.Unload();
+					continue;
+				}
+
+				if (Activator.CreateInstance(factoryType) is not IRadioModuleFactory factory)
+				{
+					log("discovery", $"Skipped plugin '{assemblyPath}' because the factory could not be instantiated.");
+					loadContext.Unload();
+					continue;
+				}
+
+				if (factory.ContractVersion != RadioContract.Version)
+				{
+					log("discovery", $"Skipped plugin '{assemblyPath}' because it targets contract version {factory.ContractVersion} instead of {RadioContract.Version}.");
+					loadContext.Unload();
+					continue;
+				}
+
+				modules.Add(new DiscoveredRadioModule(
+					assemblyPath,
+					loadContext,
+					factory.TypeId,
+					factory.DisplayName,
+					factory.Version,
+					factory.ConfigSchema,
+					factory.Capabilities,
+					factory));
+			}
+			catch (Exception ex) when (ex is not OutOfMemoryException)
+			{
+				log("discovery", $"Failed to load radio plugin '{assemblyPath}': {ex.Message}");
+			}
+		}
+
+		return new RadioPluginCatalog(pluginDirectoryPath, modules.AsReadOnly());
+	}
+}
+
+internal sealed record DiscoveredRadioModule(
+	string AssemblyPath,
+	AssemblyLoadContext LoadContext,
+	string TypeId,
+	string DisplayName,
+	string Version,
+	string ConfigSchema,
+	RadioCapabilities Capabilities,
+	IRadioModuleFactory Factory);
+
+internal sealed class AudioProcessorPersistedTopology
+{
+	private static readonly JsonSerializerOptions SerializerOptions = new()
+	{
+		PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+		WriteIndented = false
+	};
+
+	private AudioProcessorPersistedTopology(
+		IReadOnlyList<PersistedRadioDefinition> radioDefinitions,
+		IReadOnlyList<RelaySetDefinition> relaySets)
+	{
+		RadioDefinitions = radioDefinitions;
+		RelaySets = relaySets;
+	}
+
+	public IReadOnlyList<PersistedRadioDefinition> RadioDefinitions { get; }
+
+	public IReadOnlyList<RelaySetDefinition> RelaySets { get; }
+
+	public static AudioProcessorPersistedTopology Load(IAudioProcessorStoredConfig storedConfig)
+	{
+		ArgumentNullException.ThrowIfNull(storedConfig);
+
+		return new AudioProcessorPersistedTopology(
+			DeserializeList<PersistedRadioDefinition>(storedConfig.RadioDefinitionsJson),
+			DeserializeList<RelaySetDefinition>(storedConfig.RelaySetsJson));
+	}
+
+	private static IReadOnlyList<T> DeserializeList<T>(string? json)
+	{
+		if (string.IsNullOrWhiteSpace(json))
+		{
+			return Array.Empty<T>();
+		}
+
+		try
+		{
+			return JsonSerializer.Deserialize<T[]>(json, SerializerOptions) ?? Array.Empty<T>();
+		}
+		catch (JsonException)
+		{
+			return Array.Empty<T>();
+		}
+	}
+}
+
+internal sealed record PersistedRadioDefinition(
+	string RadioId,
+	string TypeId,
+	string DisplayName,
+	string Kind,
+	string? InstanceConfigJson);
+
+internal sealed record RelaySetDefinition(
+	string RelaySetId,
+	string ComPort,
+	int Baud,
+	string Protocol,
+	int ChannelCount);
 
 	/// <summary>
 	/// Reapplies retained subscriptions and republishes the current AP health snapshot after MQTT reconnects.
@@ -252,16 +420,32 @@ internal sealed class AudioProcessorCoordinator : IAsyncDisposable
 
 	private void ApplyManualPtt(ManualPttRequest request)
 	{
+		ArgumentNullException.ThrowIfNull(request);
+
 		if (request.IsPressed)
 		{
-			_txController.BeginManualTransmit(request.RadioId);
+			var startResult = _txController.BeginManualTransmit(request.RadioId);
+			if (!startResult.Started)
+			{
+				AudioProcessorLog.Write("tx", $"Manual transmit rejected for '{request.RadioId.Value}': {startResult.Detail}");
+				return;
+			}
+
+			AudioProcessorLog.Write("tx", $"Manual transmit started for '{request.RadioId.Value}' using {_txController.GetState(request.RadioId).KeyingMethodLabel} keying.");
 			_routingState.SetOperatorMicTarget(request.RadioId);
 			_mixerState.SetChannelActive(AudioChannelId.OperatorMic, true);
 			_mixerState.SetTransmitTarget(request.RadioId, true);
 			return;
 		}
 
-		_txController.EndManualTransmit(request.RadioId);
+		var stopResult = _txController.EndManualTransmit(request.RadioId);
+		if (!stopResult.Stopped)
+		{
+			AudioProcessorLog.Write("tx", $"Manual transmit release ignored for '{request.RadioId.Value}': {stopResult.Detail}");
+			return;
+		}
+
+		AudioProcessorLog.Write("tx", $"Manual transmit released for '{request.RadioId.Value}'.");
 		_routingState.ClearOperatorMicTarget(request.RadioId);
 		_mixerState.SetTransmitTarget(request.RadioId, false);
 
@@ -278,6 +462,8 @@ internal sealed class AudioProcessorCoordinator : IAsyncDisposable
 			AudioProcessorJson.Serialize(ServiceRegistryPayload.Create(_registry)),
 			retain: true,
 			cancellationToken: cancellationToken).ConfigureAwait(false);
+
+		await PublishRadioRuntimeAsync(cancellationToken).ConfigureAwait(false);
 
 		await _mqttRuntime.PublishAsync(
 			_topics.RoutingStateTopic,
@@ -327,6 +513,20 @@ internal sealed class AudioProcessorCoordinator : IAsyncDisposable
 					activeManualTransmitRadioId: _txController.ActiveManualTransmitRadioId?.Value)),
 			retain: true,
 			cancellationToken: cancellationToken).ConfigureAwait(false);
+
+		await PublishRadioRuntimeAsync(cancellationToken).ConfigureAwait(false);
+	}
+
+	/// <summary>
+	/// Publishes retained per-radio config, capabilities, and runtime TX state for dynamic admin consumers.
+	/// </summary>
+	private async Task PublishRadioRuntimeAsync(CancellationToken cancellationToken)
+	{
+		await _mqttRuntime.PublishAsync(
+			_topics.RadioRuntimeTopic,
+			AudioProcessorJson.Serialize(RadioRuntimePayload.Create(_registry, _txController)),
+			retain: true,
+			cancellationToken: cancellationToken).ConfigureAwait(false);
 	}
 
 	/// <summary>
@@ -344,34 +544,211 @@ internal sealed class AudioProcessorCoordinator : IAsyncDisposable
 
 internal sealed class AudioProcessorRegistry
 {
-	public AudioProcessorRegistry(IReadOnlyList<RadioId> radioIds, IReadOnlyList<BridgeDefinition> bridges)
+	public AudioProcessorRegistry(IReadOnlyList<RadioRuntimeDefinition> radios, IReadOnlyList<BridgeDefinition> bridges)
 	{
-		ArgumentNullException.ThrowIfNull(radioIds);
+		ArgumentNullException.ThrowIfNull(radios);
 		ArgumentNullException.ThrowIfNull(bridges);
 
-		RadioIds = radioIds;
+		Radios = radios;
 		Bridges = bridges;
 	}
 
-	public IReadOnlyList<RadioId> RadioIds { get; }
+	/// <summary>
+	/// Gets the declared radio resources and module-backed radios known to the AP.
+	/// </summary>
+	public IReadOnlyList<RadioRuntimeDefinition> Radios { get; }
+
+	/// <summary>
+	/// Gets the stable logical radio ids used by the mixer, routing, and TX controller.
+	/// </summary>
+	public IReadOnlyList<RadioId> RadioIds => Radios.Select(static radio => radio.Id).ToArray();
 
 	public IReadOnlyList<BridgeDefinition> Bridges { get; }
 
 	public static AudioProcessorRegistry CreateDefault()
 	{
-		var radios = new List<RadioId>
+		var radios = new List<RadioRuntimeDefinition>
 		{
-			new("barrett"),
-			new("xpr"),
-			new("mtm5400"),
-			new("apx-xtl"),
-			new("harris"),
-			new("4w")
+			CreateModuleRadio(
+				id: "barrett",
+				typeId: "barrett_2050",
+				displayName: "Barrett 2050",
+				controls: ["channel_select", "zone_select"]),
+			CreateModuleRadio(
+				id: "xpr",
+				typeId: "motorola_xpr",
+				displayName: "Motorola XPR",
+				controls: ["channel_select", "zone_select", "set_power"]),
+			CreateModuleRadio(
+				id: "mtm5400",
+				typeId: "motorola_mtm5400",
+				displayName: "Motorola MTM5400",
+				controls: ["channel_select", "zone_select", "set_power"]),
+			CreateModuleRadio(
+				id: "apx-xtl",
+				typeId: "motorola_apx_xtl",
+				displayName: "Motorola APX/XTL",
+				controls: ["channel_select", "zone_select", "set_power"]),
+			CreateModuleRadio(
+				id: "harris",
+				typeId: "harris_mobile",
+				displayName: "Harris Mobile",
+				controls: ["channel_select", "zone_select"]),
+			CreateResourceRadio(
+				id: "4w",
+				typeId: "4w_resource",
+				displayName: "4-Wire Resource")
 		};
 
 		return new AudioProcessorRegistry(radios.AsReadOnly(), Array.Empty<BridgeDefinition>());
 	}
+
+	/// <summary>
+	/// Creates a built-in radio resource that uses AP relay keying and VOX detection only.
+	/// </summary>
+	private static RadioRuntimeDefinition CreateResourceRadio(string id, string typeId, string displayName)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(id);
+		ArgumentException.ThrowIfNullOrWhiteSpace(typeId);
+		ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
+
+		var capabilities = new RadioCapabilities(
+			Keying: [KeyingMethod.Relay],
+			Detect: [DetectMethod.Vox],
+			ProvidesAudio: false,
+			Controls: []);
+
+		return CreateRadioDefinition(
+			new RadioId(id),
+			typeId,
+			displayName,
+			RadioRuntimeKind.Resource,
+			capabilities,
+			CreateResourceSettingsSchema(),
+			new RadioModuleInstanceConfig(
+				new KeyingConfig(KeyingMethod.Relay, new RelayBinding("RS-1", 1), 80, 40, false),
+				new DetectConfig(DetectMethod.Vox, new VoxConfig(-45d, 20, 250)),
+				new DeviceBindingConfig($"radio-{id}"),
+				new JsonObject()));
+	}
+
+	/// <summary>
+	/// Creates a module-backed radio that can either use AP relay and VOX or RM-owned keying and detection.
+	/// </summary>
+	private static RadioRuntimeDefinition CreateModuleRadio(string id, string typeId, string displayName, IReadOnlyList<string> controls)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(id);
+		ArgumentException.ThrowIfNullOrWhiteSpace(typeId);
+		ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
+		ArgumentNullException.ThrowIfNull(controls);
+
+		var capabilities = new RadioCapabilities(
+			Keying: [KeyingMethod.Relay, KeyingMethod.Rm],
+			Detect: [DetectMethod.Vox, DetectMethod.Rm],
+			ProvidesAudio: false,
+			Controls: controls);
+
+		return CreateRadioDefinition(
+			new RadioId(id),
+			typeId,
+			displayName,
+			RadioRuntimeKind.Module,
+			capabilities,
+			CreateModuleSettingsSchema(controls),
+			new RadioModuleInstanceConfig(
+				new KeyingConfig(KeyingMethod.Rm, null, 120, 60, true),
+				new DetectConfig(DetectMethod.Rm, null),
+				new DeviceBindingConfig($"radio-{id}"),
+				new JsonObject
+				{
+					["default_channel"] = 1,
+					["default_zone"] = 1
+				}));
+	}
+
+	private static RadioRuntimeDefinition CreateRadioDefinition(
+		RadioId id,
+		string typeId,
+		string displayName,
+		RadioRuntimeKind kind,
+		RadioCapabilities capabilities,
+		string settingsSchema,
+		RadioModuleInstanceConfig config)
+	{
+		ArgumentNullException.ThrowIfNull(id);
+		ArgumentException.ThrowIfNullOrWhiteSpace(typeId);
+		ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
+		ArgumentNullException.ThrowIfNull(capabilities);
+		ArgumentException.ThrowIfNullOrWhiteSpace(settingsSchema);
+		ArgumentNullException.ThrowIfNull(config);
+
+		var instanceSchema = RadioModuleSchemaBuilder.BuildInstanceSchema(capabilities, settingsSchema).ToJsonString();
+		return new RadioRuntimeDefinition(id, typeId, displayName, kind, capabilities, settingsSchema, instanceSchema, config);
+	}
+
+	private static string CreateResourceSettingsSchema()
+	{
+		return """
+		{
+		  "$schema": "https://json-schema.org/draft/2020-12/schema",
+		  "type": "object",
+		  "properties": {},
+		  "additionalProperties": false
+		}
+		""";
+	}
+
+	private static string CreateModuleSettingsSchema(IReadOnlyList<string> controls)
+	{
+		ArgumentNullException.ThrowIfNull(controls);
+
+		var controlsSchema = new JsonArray();
+		foreach (var control in controls)
+		{
+			controlsSchema.Add(JsonValue.Create(control));
+		}
+
+		var schema = new JsonObject
+		{
+			["$schema"] = "https://json-schema.org/draft/2020-12/schema",
+			["type"] = "object",
+			["properties"] = new JsonObject
+			{
+				["default_channel"] = new JsonObject { ["type"] = "integer", ["minimum"] = 1 },
+				["default_zone"] = new JsonObject { ["type"] = "integer", ["minimum"] = 1 },
+				["controls"] = new JsonObject
+				{
+					["type"] = "array",
+					["items"] = new JsonObject
+					{
+						["type"] = "string",
+						["enum"] = controlsSchema
+					}
+				}
+			},
+			["additionalProperties"] = false
+		};
+
+		return schema.ToJsonString();
+	}
 }
+
+internal enum RadioRuntimeKind
+{
+	Resource,
+	Module,
+	AdvancedModule
+}
+
+internal sealed record RadioRuntimeDefinition(
+	RadioId Id,
+	string TypeId,
+	string DisplayName,
+	RadioRuntimeKind Kind,
+	RadioCapabilities Capabilities,
+	string SettingsSchema,
+	string InstanceSchema,
+	RadioModuleInstanceConfig Config);
 
 internal sealed class AudioProcessorRoutingState
 {
@@ -423,38 +800,125 @@ internal sealed class AudioProcessorRoutingState
 
 internal sealed class TxController
 {
-	private readonly HashSet<RadioId> _knownRadioIds;
+	private readonly Dictionary<string, RadioTxState> _radioStates;
 
-	public TxController(IEnumerable<RadioId> radioIds)
+	public TxController(IEnumerable<RadioRuntimeDefinition> radios)
 	{
-		ArgumentNullException.ThrowIfNull(radioIds);
-		_knownRadioIds = new HashSet<RadioId>(radioIds);
+		ArgumentNullException.ThrowIfNull(radios);
+		_radioStates = radios.ToDictionary(
+			static radio => radio.Id.Value,
+			static radio => RadioTxState.Create(radio),
+			StringComparer.OrdinalIgnoreCase);
 	}
 
 	public RadioId? ActiveManualTransmitRadioId { get; private set; }
 
-	public void BeginManualTransmit(RadioId radioId)
+	/// <summary>
+	/// Starts the AP-side TX state sequence for a manual transmit request.
+	/// </summary>
+	public TxStartResult BeginManualTransmit(RadioId radioId)
 	{
 		ArgumentNullException.ThrowIfNull(radioId);
 
-		if (!_knownRadioIds.Contains(radioId))
+		var state = GetMutableState(radioId);
+		if (ActiveManualTransmitRadioId is not null && ActiveManualTransmitRadioId != radioId)
 		{
-			throw new InvalidOperationException($"Unknown radio id '{radioId.Value}'.");
+			return new TxStartResult(false, $"Radio '{ActiveManualTransmitRadioId.Value}' already holds manual transmit.");
 		}
 
+		state = state with
+		{
+			State = TxStatePhase.Transmitting,
+			IsKeyAsserted = true,
+			IsTalkPermitReady = !state.Config.Keying.TalkPermit,
+			LastTransitionUtc = DateTimeOffset.UtcNow
+		};
+		_radioStates[radioId.Value] = state;
 		ActiveManualTransmitRadioId = radioId;
+		return new TxStartResult(true, $"Lead {state.Config.Keying.PttLeadMs} ms, tail {state.Config.Keying.PttTailMs} ms.");
 	}
 
-	public void EndManualTransmit(RadioId radioId)
+	/// <summary>
+	/// Ends the AP-side TX state sequence for a manual transmit release.
+	/// </summary>
+	public TxStopResult EndManualTransmit(RadioId radioId)
 	{
 		ArgumentNullException.ThrowIfNull(radioId);
 
-		if (ActiveManualTransmitRadioId == radioId)
+		var state = GetMutableState(radioId);
+		if (ActiveManualTransmitRadioId != radioId)
 		{
-			ActiveManualTransmitRadioId = null;
+			return new TxStopResult(false, "Radio is not the active manual transmit target.");
 		}
+
+		state = state with
+		{
+			State = TxStatePhase.Idle,
+			IsKeyAsserted = false,
+			IsTalkPermitReady = false,
+			LastTransitionUtc = DateTimeOffset.UtcNow
+		};
+		_radioStates[radioId.Value] = state;
+		ActiveManualTransmitRadioId = null;
+		return new TxStopResult(true, $"Tail {state.Config.Keying.PttTailMs} ms complete.");
+	}
+
+	/// <summary>
+	/// Gets the current AP TX state for a known radio.
+	/// </summary>
+	public RadioTxState GetState(RadioId radioId)
+	{
+		ArgumentNullException.ThrowIfNull(radioId);
+		return GetMutableState(radioId);
+	}
+
+	private RadioTxState GetMutableState(RadioId radioId)
+	{
+		if (_radioStates.TryGetValue(radioId.Value, out var state))
+		{
+			return state;
+		}
+
+		throw new InvalidOperationException($"Unknown radio id '{radioId.Value}'.");
 	}
 }
+
+internal enum TxStatePhase
+{
+	Idle,
+	Keying,
+	Transmitting,
+	Tail
+}
+
+internal sealed record RadioTxState(
+	RadioId RadioId,
+	RadioRuntimeKind Kind,
+	RadioModuleInstanceConfig Config,
+	TxStatePhase State,
+	bool IsKeyAsserted,
+	bool IsTalkPermitReady,
+	DateTimeOffset LastTransitionUtc)
+{
+	public string KeyingMethodLabel => Config.Keying.Method == KeyingMethod.Relay ? "relay" : "rm";
+
+	public static RadioTxState Create(RadioRuntimeDefinition radio)
+	{
+		ArgumentNullException.ThrowIfNull(radio);
+		return new RadioTxState(
+			radio.Id,
+			radio.Kind,
+			radio.Config,
+			TxStatePhase.Idle,
+			false,
+			false,
+			DateTimeOffset.UtcNow);
+	}
+}
+
+internal sealed record TxStartResult(bool Started, string Detail);
+
+internal sealed record TxStopResult(bool Stopped, string Detail);
 
 internal sealed class AudioProcessorTopicFactory
 {
@@ -481,6 +945,8 @@ internal sealed class AudioProcessorTopicFactory
 	public string AudioMixerStateTopic => $"{RootTopic}/state/audio-mixer";
 
 	public string InternetRadioStateTopic => $"{RootTopic}/state/internet-radio";
+
+	public string RadioRuntimeTopic => $"{RootTopic}/state/radios";
 
 	public string RoutingStateTopic => $"{RootTopic}/state/routing";
 
@@ -1004,6 +1470,7 @@ internal sealed record InternetRadioPlaybackState(bool IsPlaying, string? Stream
 internal sealed record ServiceRegistryPayload(
 	string ServiceId,
 	string DisplayName,
+	IReadOnlyList<RadioRegistryPayload> Radios,
 	IReadOnlyList<string> RadioIds,
 	IReadOnlyList<string> BridgeIds)
 {
@@ -1014,8 +1481,121 @@ internal sealed record ServiceRegistryPayload(
 		return new ServiceRegistryPayload(
 			ServiceId: "audio-processor",
 			DisplayName: "Audio Processor",
+			Radios: registry.Radios.Select(static radio => new RadioRegistryPayload(
+				radio.Id.Value,
+				radio.TypeId,
+				radio.DisplayName,
+				radio.Kind.ToString(),
+				radio.Capabilities,
+				radio.SettingsSchema,
+				radio.InstanceSchema)).ToArray(),
 			RadioIds: registry.RadioIds.Select(static radioId => radioId.Value).ToArray(),
 			BridgeIds: registry.Bridges.Select(static bridge => bridge.Id.Value).ToArray());
+	}
+}
+
+internal sealed record RadioRegistryPayload(
+	string RadioId,
+	string TypeId,
+	string DisplayName,
+	string Kind,
+	RadioCapabilities Capabilities,
+	string ConfigSchema,
+	string InstanceSchema);
+
+internal sealed record RadioRuntimePayload(IReadOnlyList<RadioRuntimeStatePayload> Radios)
+{
+	public static RadioRuntimePayload Create(AudioProcessorRegistry registry, TxController txController)
+	{
+		ArgumentNullException.ThrowIfNull(registry);
+		ArgumentNullException.ThrowIfNull(txController);
+
+		return new RadioRuntimePayload(
+			registry.Radios.Select(radio =>
+			{
+				var state = txController.GetState(radio.Id);
+				return new RadioRuntimeStatePayload(
+					RadioId: radio.Id.Value,
+					TypeId: radio.TypeId,
+					DisplayName: radio.DisplayName,
+					Kind: radio.Kind.ToString(),
+					Capabilities: radio.Capabilities,
+					ConfigSchema: radio.SettingsSchema,
+					InstanceSchema: radio.InstanceSchema,
+					Config: RadioInstanceConfigPayload.Create(radio.Config),
+					TxState: RadioTxStatePayload.Create(state));
+			}).ToArray());
+	}
+}
+
+internal sealed record RadioRuntimeStatePayload(
+	string RadioId,
+	string TypeId,
+	string DisplayName,
+	string Kind,
+	RadioCapabilities Capabilities,
+	string ConfigSchema,
+	string InstanceSchema,
+	RadioInstanceConfigPayload Config,
+	RadioTxStatePayload TxState);
+
+internal sealed record RadioInstanceConfigPayload(
+	KeyingConfigPayload Keying,
+	DetectConfigPayload Detect,
+	DeviceBindingPayload? Device,
+	JsonObject Settings)
+{
+	public static RadioInstanceConfigPayload Create(RadioModuleInstanceConfig config)
+	{
+		ArgumentNullException.ThrowIfNull(config);
+		return new RadioInstanceConfigPayload(
+			KeyingConfigPayload.Create(config.Keying),
+			DetectConfigPayload.Create(config.Detect),
+			config.Device is null ? null : new DeviceBindingPayload(config.Device.Soundcard),
+			(JsonObject)config.Settings.DeepClone());
+	}
+}
+
+internal sealed record KeyingConfigPayload(string Method, RelayBinding? Relay, int PttLeadMs, int PttTailMs, bool TalkPermit)
+{
+	public static KeyingConfigPayload Create(KeyingConfig config)
+	{
+		ArgumentNullException.ThrowIfNull(config);
+		return new KeyingConfigPayload(config.Method.ToString().ToLowerInvariant(), config.Relay, config.PttLeadMs, config.PttTailMs, config.TalkPermit);
+	}
+}
+
+internal sealed record DetectConfigPayload(string Method, VoxConfig? Vox)
+{
+	public static DetectConfigPayload Create(DetectConfig config)
+	{
+		ArgumentNullException.ThrowIfNull(config);
+		return new DetectConfigPayload(config.Method.ToString().ToLowerInvariant(), config.Vox);
+	}
+}
+
+internal sealed record DeviceBindingPayload(string? Soundcard);
+
+internal sealed record RadioTxStatePayload(
+	string Phase,
+	bool IsKeyAsserted,
+	bool IsTalkPermitReady,
+	string KeyingMethod,
+	int PttLeadMs,
+	int PttTailMs,
+	DateTimeOffset LastTransitionUtc)
+{
+	public static RadioTxStatePayload Create(RadioTxState state)
+	{
+		ArgumentNullException.ThrowIfNull(state);
+		return new RadioTxStatePayload(
+			state.State.ToString(),
+			state.IsKeyAsserted,
+			state.IsTalkPermitReady,
+			state.Config.Keying.Method.ToString().ToLowerInvariant(),
+			state.Config.Keying.PttLeadMs,
+			state.Config.Keying.PttTailMs,
+			state.LastTransitionUtc);
 	}
 }
 

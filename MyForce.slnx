@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="MyForce.Contracts.Radio/MyForce.Contracts.Radio.csproj" />
   <Project Path="MyForce/MyForce_UI.csproj" />
   <Project Path="MyForce_Audio_Processor/MyForce_Audio_Processor.csproj" Id="b3fe1804-14a7-4e1d-b02c-08e82614d16a" />
   <Project Path="MyForce_CarInterface/MyForce_CarInterface.csproj" Id="5dfd1248-0595-4c32-b6e8-65606c39d91f" />
