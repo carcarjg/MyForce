@@ -497,6 +497,7 @@ internal sealed record AudioMixerSnapshot(ReadOnlyCollection<AudioMixerChannelSt
 internal sealed class AudioFrameworkCatalog
 {
     public const string DefaultSpeakerDeviceId = "default-speaker";
+    public const string SystemDefaultSpeakerDisplayName = "System Default Output";
 
     public AudioFrameworkCatalog(
         IReadOnlyList<AudioDevice> devices,
@@ -535,7 +536,7 @@ internal sealed class AudioFrameworkCatalog
         }
         else
         {
-            devices.Add(new AudioDevice(new AudioDeviceId(DefaultSpeakerDeviceId), "Default Speaker", "speaker", false, true));
+            devices.Add(new AudioDevice(new AudioDeviceId(DefaultSpeakerDeviceId), SystemDefaultSpeakerDisplayName, "speaker", false, true));
         }
 
         devices.AddRange(radioIdList.Select(static radioId =>
@@ -1236,13 +1237,16 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
     private LinuxPlayerLaunch? TryStartLinuxPlayer(string streamUrl)
     {
         var sinkName = _outputSpeakerDeviceId;
-        if (string.IsNullOrWhiteSpace(sinkName))
+        var useSystemDefaultSink = string.IsNullOrWhiteSpace(sinkName)
+            || string.Equals(sinkName, AudioFrameworkCatalog.DefaultSpeakerDeviceId, StringComparison.OrdinalIgnoreCase);
+
+        if (string.IsNullOrWhiteSpace(sinkName) && !useSystemDefaultSink)
         {
             Console.WriteLine("[audio-processor] No PipeWire sink is selected for the AP master output.");
             return null;
         }
 
-        var candidate = LinuxPlayerCandidate.CreateFfplay(GetLinuxPlayerVolumePercent(), streamUrl, sinkName);
+        var candidate = LinuxPlayerCandidate.CreateFfplay(GetLinuxPlayerVolumePercent(), streamUrl, useSystemDefaultSink ? null : sinkName);
         Console.WriteLine($"[audio-processor] Launching Linux internet radio player: {candidate.StartInfo.FileName} {string.Join(' ', candidate.StartInfo.ArgumentList)}");
         var process = new Process
         {
@@ -1315,13 +1319,17 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
     private string GetPlaybackBackendDescription()
     {
         var backendLabel = _activeBackend ?? "the configured PipeWire output";
-        return $"{backendLabel} routed to {_outputSpeakerDeviceId}";
+        var outputLabel = string.Equals(_outputSpeakerDeviceId, AudioFrameworkCatalog.DefaultSpeakerDeviceId, StringComparison.OrdinalIgnoreCase)
+            ? AudioFrameworkCatalog.SystemDefaultSpeakerDisplayName
+            : _outputSpeakerDeviceId;
+        return $"{backendLabel} routed to {outputLabel}";
     }
 
     private string BuildLinuxPlaybackUnavailableMessage()
     {
         var sinkName = _outputSpeakerDeviceId;
-        if (string.IsNullOrWhiteSpace(sinkName))
+        if (string.IsNullOrWhiteSpace(sinkName)
+            || string.Equals(sinkName, AudioFrameworkCatalog.DefaultSpeakerDeviceId, StringComparison.OrdinalIgnoreCase))
         {
             return "Linux internet radio playback requires ffplay and a selected PipeWire output device for the AP master output.";
         }
@@ -1402,7 +1410,11 @@ internal sealed class LinuxPlayerCandidate
         startInfo.ArgumentList.Add("-volume");
         startInfo.ArgumentList.Add(volumePercent.ToString(System.Globalization.CultureInfo.InvariantCulture));
         startInfo.ArgumentList.Add(streamUrl);
-        return new LinuxPlayerCandidate($"ffplay on PipeWire sink '{sinkName}'", startInfo);
+        return new LinuxPlayerCandidate(
+            string.IsNullOrWhiteSpace(sinkName)
+                ? "ffplay on the PipeWire system default output"
+                : $"ffplay on PipeWire sink '{sinkName}'",
+            startInfo);
     }
 
     private static ProcessStartInfo CreateStartInfo(string fileName)

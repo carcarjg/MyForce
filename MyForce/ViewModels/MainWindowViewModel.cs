@@ -153,8 +153,6 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 	// Stores the current directional status shown in the status panel.
 	private string _directionalStatus = "OFF";
 
-	private string _sirenStatus = "DISABLED";
-
 	private string _currentTalkRadioVolume = "13";
 
 	private decimal _amFmFrequency = 97.5m;
@@ -317,11 +315,23 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		set => SetProperty(ref _directionalStatus, value);
 	}
 
-	public string SirenStatus
+	public string EntertainmentModePrefix => _selectedAuxiliarySourceMode switch
 	{
-		get => _sirenStatus;
-		set => SetProperty(ref _sirenStatus, value);
-	}
+		AuxiliaryAudioSourceMode.Fm1 => "FM1:",
+		AuxiliaryAudioSourceMode.Am1 => "AM1:",
+		AuxiliaryAudioSourceMode.Bluetooth => "BT:",
+		AuxiliaryAudioSourceMode.InternetRadio => "INT:",
+		_ => throw new ArgumentOutOfRangeException(),
+	};
+
+	public string EntertainmentModeName => _selectedAuxiliarySourceMode switch
+	{
+		AuxiliaryAudioSourceMode.Fm1 => AmFmFrequencyDisplay,
+		AuxiliaryAudioSourceMode.Am1 => _amFrequency.ToString("0.0", CultureInfo.InvariantCulture),
+		AuxiliaryAudioSourceMode.Bluetooth => _bluetoothDisplayLabel,
+		AuxiliaryAudioSourceMode.InternetRadio => _selectedInternetStation?.DisplayName ?? "NO CHANNEL",
+		_ => throw new ArgumentOutOfRangeException(),
+	};
 
 	//Extra Info Provided by the Currently Selected channel. could be currently talking rid or somehting
 	public string CurSelChExt1 { get => _CurSelChExt1; set => SetProperty(ref _CurSelChExt1, value); }
@@ -727,7 +737,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	public string AppliedAudioOutputSpeakerLabel => ResolveAudioOutputSpeakerLabel(ApConfiguredOutputSpeakerId);
 
-	public string AdminAudioDeviceSummary => $"MASTER OUTPUT: {AppliedAudioOutputSpeakerLabel}  CHANNEL DEVICES: {Math.Max(AudioOutputDevices.Count - 1, 0)}";
+	public string AdminAudioDeviceSummary => $"MASTER: {AppliedAudioOutputSpeakerLabel}  CHANNELS: {Math.Max(AudioOutputDevices.Count - 1, 0)}";
 
 	/// <summary>
 	/// Gets the summary line shown in the System status page.
@@ -1696,6 +1706,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmPreset4Label)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmPreset5Label)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AmFmPreset6Label)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EntertainmentModePrefix)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(EntertainmentModeName)));
 	}
 
 	private void RaiseInternetChannelListStateChanged()

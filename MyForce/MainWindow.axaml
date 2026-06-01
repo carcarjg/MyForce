@@ -245,10 +245,24 @@
                                    Height="31"
                                    FontSize="18"
                                    Text="SCENE :  LA / TD / RA" />
-                        <TextBlock Classes="white"
-                                   Height="31"
-                                   FontSize="18"
-                                   Text="{Binding SirenStatus, StringFormat='SIREN :  {0}'}" />
+                        <Grid Height="31"
+                              ColumnDefinitions="Auto,*"
+                              ColumnSpacing="4">
+                            <TextBlock Classes="white"
+                                       FontSize="18"
+                                       VerticalAlignment="Center"
+                                       Text="{Binding EntertainmentModePrefix}" />
+                            <Viewbox Grid.Column="1"
+                                     Stretch="Uniform"
+                                     StretchDirection="DownOnly"
+                                     HorizontalAlignment="Left"
+                                     VerticalAlignment="Center"
+                                     MaxWidth="238"
+                                     MaxHeight="31">
+                                <TextBlock Classes="white"
+                                           Text="{Binding EntertainmentModeName}" />
+                            </Viewbox>
+                        </Grid>
                     </StackPanel>
                 </Border>
 
@@ -1504,56 +1518,61 @@
                                                   IsVisible="{Binding IsAdminAudioSectionSelected}"
                                                   HorizontalScrollBarVisibility="Disabled"
                                                   VerticalScrollBarVisibility="Auto">
-                                        <StackPanel Spacing="12">
+                                        <StackPanel Spacing="8"
+                                                    MaxWidth="560"
+                                                    HorizontalAlignment="Stretch">
                                             <Border Classes="panel"
-                                                    Padding="10">
-                                                <StackPanel Spacing="6">
+                                                    Padding="8">
+                                                <StackPanel Spacing="4">
                                                     <TextBlock Classes="white"
-                                                               FontSize="20"
+                                                               FontSize="18"
                                                                Text="MASTER MIXER OUTPUT" />
                                                     <TextBlock Classes="white"
-                                                               FontSize="14"
+                                                               FontSize="12"
                                                                TextWrapping="Wrap"
-                                                               Text="Select which AP speaker device receives the master entertainment and monitor mix, then push the configuration to the audio processor." />
+                                                               Text="Select the AP master output device. All other AP audio devices remain channel endpoints." />
                                                 </StackPanel>
                                             </Border>
 
                                             <Border Classes="buttonFrame"
-                                                    Padding="10">
-                                                <StackPanel Spacing="6">
+                                                    Padding="8">
+                                                <StackPanel Spacing="4">
                                                     <TextBlock Classes="white"
-                                                               FontSize="14"
+                                                               FontSize="12"
                                                                TextWrapping="Wrap"
                                                                Text="{Binding AdminAudioStatus}" />
                                                     <TextBlock Classes="white"
-                                                               FontSize="14"
+                                                               FontSize="12"
                                                                Text="{Binding AppliedAudioOutputSpeakerLabel, StringFormat='APPLIED: {0}'}" />
                                                     <TextBlock Classes="white"
-                                                               FontSize="14"
+                                                               FontSize="12"
                                                                Text="{Binding SelectedAudioOutputSpeakerLabel, StringFormat='SELECTED: {0}'}" />
                                                     <TextBlock Classes="white"
-                                                               FontSize="13"
+                                                               FontSize="11"
                                                                TextWrapping="Wrap"
                                                                Text="{Binding AdminAudioDeviceSummary}" />
                                                 </StackPanel>
                                             </Border>
 
-                                            <ItemsControl ItemsSource="{Binding AudioOutputDevices}">
+                                            <ScrollViewer MaxHeight="240"
+                                                          HorizontalScrollBarVisibility="Disabled"
+                                                          VerticalScrollBarVisibility="Auto">
+                                                <ItemsControl ItemsSource="{Binding AudioOutputDevices}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="models:AudioDeviceStateMessage">
                                                         <Border Classes="buttonFrame"
                                                                 Margin="0,0,0,8"
-                                                                Padding="10"
+                                                            Padding="8"
                                                                 Tag="{Binding DeviceId}"
                                                                 PointerPressed="OnAdminAudioOutputSpeakerPressed">
                                                             <Grid ColumnDefinitions="*,Auto"
-                                                                  ColumnSpacing="8">
-                                                                <StackPanel Spacing="4">
+                                                                ColumnSpacing="6">
+                                                                <StackPanel Spacing="2">
                                                                     <TextBlock Classes="white"
-                                                                               FontSize="18"
+                                                                                FontSize="15"
                                                                                Text="{Binding DisplayName}" />
                                                                     <TextBlock Classes="white"
-                                                                               FontSize="12"
+                                                                                FontSize="10"
                                                                                Text="{Binding DeviceId}" />
                                                                 </StackPanel>
                                                                 <Border Grid.Column="1"
@@ -1561,24 +1580,25 @@
                                                                         BorderBrush="{StaticResource ActiveButtonBorderBrush}"
                                                                         BorderThickness="1"
                                                                         CornerRadius="2"
-                                                                        Padding="6,3"
+                                                                        Padding="5,2"
                                                                         VerticalAlignment="Center">
                                                                     <TextBlock Classes="white"
-                                                                               FontSize="12"
+                                                                                FontSize="11"
                                                                                Text="SELECT" />
                                                                 </Border>
                                                             </Grid>
                                                         </Border>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
+                                                </ItemsControl>
+                                            </ScrollViewer>
 
                                             <Border Classes="buttonFrame"
                                                     IsVisible="{Binding HasAudioOutputDevices}"
                                                     PointerPressed="OnAdminPushAudioConfigPressed"
-                                                    Padding="12">
+                                                    Padding="8">
                                                 <TextBlock Classes="white"
-                                                           FontSize="18"
+                                                           FontSize="15"
                                                            TextAlignment="Center"
                                                            Text="PUSH CONFIG TO AP" />
                                             </Border>
