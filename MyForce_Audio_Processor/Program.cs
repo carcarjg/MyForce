@@ -559,12 +559,6 @@ internal sealed class AudioProcessorConfigStore
 
 	private static string ResolveConfigPath()
 	{
-		var configuredPath = Environment.GetEnvironmentVariable("MYFORCE_AUDIO_PROCESSOR_CONFIG_PATH");
-		if (!string.IsNullOrWhiteSpace(configuredPath))
-		{
-			return Path.GetFullPath(configuredPath);
-		}
-
 		var appConfigDirectory = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
 		if (!string.IsNullOrWhiteSpace(appConfigDirectory))
 		{
@@ -596,4 +590,6 @@ public interface IAudioProcessorStoredConfig
 	string? RadioDefinitionsJson { get; set; }
 
 	string? RelaySetsJson { get; set; }
+
+	string? PluginDirectoryPath { get; set; }
 }

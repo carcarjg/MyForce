@@ -119,7 +119,7 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
 	{
 		_serviceName = serviceName;
 		_lastWillMessage = lastWillMessage;
-		_options = MqttServiceOptions.FromEnvironment(serviceName);
+		_options = MqttServiceOptions.Load(serviceName);
 		_client = new MqttClientFactory().CreateMqttClient();
 		_client.ConnectedAsync += OnConnectedAsync;
 		_client.DisconnectedAsync += OnDisconnectedAsync;
@@ -953,6 +953,8 @@ internal sealed class GpioControllerConfigStore
 {
 	private const string ConfigFileName = "gpio-controller.config.json";
 
+	private const string ConfigDirectoryName = "myforce";
+
 	private readonly IGpioControllerStoredConfig _storedConfig;
 
 	public GpioControllerConfigStore()
@@ -994,12 +996,14 @@ internal sealed class GpioControllerConfigStore
 		_storedConfig.LastUpdatedUtc = string.Empty;
 	}
 
+	public IGpioControllerStoredConfig StoredConfig => _storedConfig;
+
 	private static string ResolveConfigPath()
 	{
-		var configuredPath = Environment.GetEnvironmentVariable("MYFORCE_GPIO_CONFIG_PATH");
-		if (!string.IsNullOrWhiteSpace(configuredPath))
+		var appConfigDirectory = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+		if (!string.IsNullOrWhiteSpace(appConfigDirectory))
 		{
-			return Path.GetFullPath(configuredPath);
+			return Path.Combine(appConfigDirectory, ConfigDirectoryName, ConfigFileName);
 		}
 
 		return Path.Combine(AppContext.BaseDirectory, ConfigFileName);
@@ -1008,6 +1012,18 @@ internal sealed class GpioControllerConfigStore
 
 public interface IGpioControllerStoredConfig
 {
+	string? MqttHost { get; set; }
+
+	string? MqttPort { get; set; }
+
+	string? MqttClientId { get; set; }
+
+	string? MqttUseTls { get; set; }
+
+	string? MqttUsername { get; set; }
+
+	string? MqttPassword { get; set; }
+
 	string? GpioControllerConfigJson { get; set; }
 
 	string? LastUpdatedUtc { get; set; }
@@ -1162,17 +1178,18 @@ internal sealed record MqttServiceOptions(
 	string? Username,
 	string? Password)
 {
-	public static MqttServiceOptions FromEnvironment(string serviceName)
+	public static MqttServiceOptions Load(string serviceName)
 	{
 		var normalizedServiceName = serviceName.Replace(' ', '-').ToLowerInvariant();
-		var clientId = Environment.GetEnvironmentVariable("MYFORCE_MQTT_CLIENT_ID");
+		var configStore = new GpioControllerConfigStore();
+		var clientId = configStore.StoredConfig.MqttClientId;
 
 		return new MqttServiceOptions(
-			Host: Environment.GetEnvironmentVariable("MYFORCE_MQTT_HOST") ?? "127.0.0.1",
-			Port: int.TryParse(Environment.GetEnvironmentVariable("MYFORCE_MQTT_PORT"), out var port) ? port : 1883,
+			Host: string.IsNullOrWhiteSpace(configStore.StoredConfig.MqttHost) ? "127.0.0.1" : configStore.StoredConfig.MqttHost,
+			Port: int.TryParse(configStore.StoredConfig.MqttPort, out var port) ? port : 1883,
 			ClientId: string.IsNullOrWhiteSpace(clientId) ? $"myforce-{normalizedServiceName}-{Environment.MachineName}" : clientId,
 			UseTls: false,
-			Username: Environment.GetEnvironmentVariable("MYFORCE_MQTT_USERNAME"),
-			Password: Environment.GetEnvironmentVariable("MYFORCE_MQTT_PASSWORD"));
+			Username: configStore.StoredConfig.MqttUsername,
+			Password: configStore.StoredConfig.MqttPassword);
 	}
 }

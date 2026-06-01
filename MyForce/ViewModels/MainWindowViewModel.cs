@@ -302,6 +302,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	private IReadOnlyList<AudioDeviceStateMessage> _audioOutputDevices = Array.Empty<AudioDeviceStateMessage>();
 
+	private IReadOnlyList<RadioRegistryEntryMessage> _availableRadioTypes = Array.Empty<RadioRegistryEntryMessage>();
+
 	private IReadOnlyList<RadioRuntimeEntryMessage> _radioRuntimeEntries = Array.Empty<RadioRuntimeEntryMessage>();
 
 	private string _apConfiguredOutputSpeakerId = DefaultAudioOutputSpeakerId;
@@ -854,6 +856,18 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		private set => SetProperty(ref _radioRuntimeEntries, value);
 	}
 
+	public IReadOnlyList<RadioRegistryEntryMessage> AvailableRadioTypes
+	{
+		get => _availableRadioTypes;
+		private set => SetProperty(ref _availableRadioTypes, value);
+	}
+
+	public bool HasAvailableRadioTypes => AvailableRadioTypes.Count > 0;
+
+	public string AdminAvailableRadioTypeSummary => HasAvailableRadioTypes
+		? $"AVAILABLE TYPES: {AvailableRadioTypes.Count}  BUILT-IN RESOURCES: {AvailableRadioTypes.Count(static radio => string.Equals(radio.Kind, "Resource", StringComparison.OrdinalIgnoreCase))}"
+		: "Waiting for retained AP radio type availability.";
+
 	public int AdminRadioEntryCount => RadioRuntimeEntries.Count;
 
 	public bool HasAdminRadioEntries => AdminRadioEntryCount > 0;
@@ -862,7 +876,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	public string AdminRadioSummary => HasAdminRadioEntries
 		? $"RADIOS: {AdminRadioEntryCount}  MODULES: {RadioRuntimeEntries.Count(static radio => string.Equals(radio.Kind, "Module", StringComparison.OrdinalIgnoreCase) || string.Equals(radio.Kind, "AdvancedModule", StringComparison.OrdinalIgnoreCase))}  RESOURCES: {RadioRuntimeEntries.Count(static radio => string.Equals(radio.Kind, "Resource", StringComparison.OrdinalIgnoreCase))}"
-		: "Waiting for retained AP radio runtime data.";
+		: HasAvailableRadioTypes
+			? "No declared radios are active yet. Use the addable type list below to add built-in resources or RM-backed radios."
+			: "Waiting for retained AP radio runtime data.";
 
 	public bool IsAdminAudioSectionSelected => SelectedAdminSection == AdminSection.Audio;
 
@@ -1585,6 +1601,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 			ClientId: $"myforce-ui-{Environment.MachineName}-{Environment.ProcessId}");
 
 		await _mqttConnectionService.ConnectAsync(settings).ConfigureAwait(false);
+		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.AudioProcessorRegistryTopic).ConfigureAwait(false);
 		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.StateTopic).ConfigureAwait(false);
 		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.AudioFrameworkStateTopic).ConfigureAwait(false);
 		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.RadioRuntimeStateTopic).ConfigureAwait(false);
@@ -1608,6 +1625,24 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	private void OnMqttMessageReceived(object? sender, MqttApplicationMessage message)
 	{
+		if (string.Equals(message.Topic, InternetRadioMqttTopics.AudioProcessorRegistryTopic, StringComparison.OrdinalIgnoreCase))
+		{
+			var registryPayload = message.ConvertPayloadToString();
+			if (string.IsNullOrWhiteSpace(registryPayload))
+			{
+				return;
+			}
+
+			var registry = JsonSerializer.Deserialize<AudioProcessorRegistryMessage>(registryPayload, MqttJsonSerializerOptions);
+			if (registry is null)
+			{
+				return;
+			}
+
+			Dispatcher.UIThread.Post(() => ApplyAudioProcessorRegistry(registry));
+			return;
+		}
+
 		if (string.Equals(message.Topic, InternetRadioMqttTopics.AudioFrameworkStateTopic, StringComparison.OrdinalIgnoreCase))
 		{
 			var frameworkPayload = message.ConvertPayloadToString();
@@ -1698,6 +1733,16 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 	{
 		ArgumentNullException.ThrowIfNull(state);
 		RadioRuntimeEntries = state.Radios ?? Array.Empty<RadioRuntimeEntryMessage>();
+		RaiseAdminNetworkStateChanged();
+	}
+
+	/// <summary>
+	/// Sections 3.9, 4.1, and 4.3: applies retained AP type availability so the Radio admin page can offer built-in resources and RM-backed radio types before instances exist.
+	/// </summary>
+	private void ApplyAudioProcessorRegistry(AudioProcessorRegistryMessage registry)
+	{
+		ArgumentNullException.ThrowIfNull(registry);
+		AvailableRadioTypes = registry.Radios ?? Array.Empty<RadioRegistryEntryMessage>();
 		RaiseAdminNetworkStateChanged();
 	}
 
@@ -2047,6 +2092,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	private void RaiseAdminNetworkStateChanged()
 	{
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AvailableRadioTypes)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasAvailableRadioTypes)));
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AdminAvailableRadioTypeSummary)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RadioRuntimeEntries)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AdminRadioEntryCount)));
 		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasAdminRadioEntries)));

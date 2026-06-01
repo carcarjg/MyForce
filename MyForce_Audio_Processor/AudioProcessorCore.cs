@@ -60,7 +60,7 @@ internal sealed class AudioProcessorCoordinator : IAsyncDisposable
 		_mqttRuntime = mqttRuntime;
 		_topics = topics;
 		_configStore = new AudioProcessorConfigStore();
-		_pluginCatalog = RadioPluginCatalog.Load(AudioProcessorPluginDirectory.Resolve(), AudioProcessorLog.Write);
+		_pluginCatalog = RadioPluginCatalog.Load(AudioProcessorPluginDirectory.Resolve(_configStore.StoredConfig), AudioProcessorLog.Write);
 		_persistedTopology = AudioProcessorPersistedTopology.Load(_configStore.StoredConfig);
 		_registry = AudioProcessorRegistry.CreateDefault();
 		_audioFramework = AudioFrameworkCatalog.CreateDefault(_registry.RadioIds, AudioFrameworkCatalog.DiscoverPlaybackDevices());
@@ -86,12 +86,13 @@ internal static class AudioProcessorPluginDirectory
 	private const string PluginDirectoryName = "plugins";
 	private const string PluginRootDirectoryName = "myforce";
 
-	public static string Resolve()
+	public static string Resolve(IAudioProcessorStoredConfig storedConfig)
 	{
-		var configuredPath = Environment.GetEnvironmentVariable("MYFORCE_AUDIO_PROCESSOR_PLUGIN_PATH");
-		if (!string.IsNullOrWhiteSpace(configuredPath))
+		ArgumentNullException.ThrowIfNull(storedConfig);
+
+		if (!string.IsNullOrWhiteSpace(storedConfig.PluginDirectoryPath))
 		{
-			return Path.GetFullPath(configuredPath);
+			return Path.GetFullPath(storedConfig.PluginDirectoryPath);
 		}
 
 		var appDataDirectory = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);

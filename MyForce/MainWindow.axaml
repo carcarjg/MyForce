@@ -1538,6 +1538,7 @@
                                                     <DataTemplate x:DataType="viewModels:AdminFrameworkComponentReference">
                                                         <Border Classes="buttonFrame"
                                                                 Margin="0,0,0,8"
+                                                                MaxWidth="540"
                                                                 Padding="10">
                                                             <StackPanel Spacing="6">
                                                                 <Grid ColumnDefinitions="*,Auto"
@@ -1603,6 +1604,7 @@
                                                     <DataTemplate x:DataType="viewModels:AdminSystemComponentStatus">
                                                         <Border Classes="buttonFrame"
                                                                 Margin="0,0,0,8"
+                                                                MaxWidth="540"
                                                                 Padding="10">
                                                             <StackPanel Spacing="6">
                                                                 <Grid ColumnDefinitions="*,Auto"
@@ -1735,8 +1737,76 @@
                                                   HorizontalScrollBarVisibility="Disabled"
                                                   VerticalScrollBarVisibility="Auto">
                                         <StackPanel Spacing="8"
-                                                    MaxWidth="720"
+                                                    MaxWidth="560"
                                                     HorizontalAlignment="Stretch">
+                                            <!-- Sections 4.1, 4.3, and 6: show retained type availability separately from declared/runtime radios so built-in resource radios can be added without RMs. -->
+                                            <Border Classes="panel"
+                                                    Padding="10">
+                                                <StackPanel Spacing="6">
+                                                    <TextBlock Classes="white"
+                                                               FontSize="18"
+                                                               Text="ADDABLE RADIO TYPES" />
+                                                    <TextBlock Classes="white"
+                                                               FontSize="12"
+                                                               TextWrapping="Wrap"
+                                                               Text="{Binding AdminAvailableRadioTypeSummary}" />
+                                                    <TextBlock Classes="white"
+                                                               FontSize="11"
+                                                               TextWrapping="Wrap"
+                                                               IsVisible="{Binding HasAvailableRadioTypes}"
+                                                               Text="Built-in AP radio resources appear here even when no RM plugins are loaded. VOX/resource radios do not require an RM." />
+                                                </StackPanel>
+                                            </Border>
+
+                                            <ItemsControl ItemsSource="{Binding AvailableRadioTypes}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="models:RadioRegistryEntryMessage">
+                                                        <Border Classes="buttonFrame"
+                                                                MaxWidth="560"
+                                                                Margin="0,0,0,8"
+                                                                Padding="10">
+                                                            <StackPanel Spacing="6">
+                                                                <Grid ColumnDefinitions="*,Auto"
+                                                                      ColumnSpacing="8">
+                                                                    <StackPanel Spacing="2">
+                                                                        <TextBlock Classes="white"
+                                                                                   FontSize="16"
+                                                                                   Text="{Binding DisplayName}" />
+                                                                        <TextBlock Classes="white"
+                                                                                   FontSize="11"
+                                                                                   TextWrapping="Wrap"
+                                                                                   Text="{Binding TypeId, StringFormat='TYPE: {0}'}" />
+                                                                    </StackPanel>
+                                                                    <Border Grid.Column="1"
+                                                                            Background="#1E1E1E"
+                                                                            BorderBrush="{StaticResource ActiveButtonBorderBrush}"
+                                                                            BorderThickness="1"
+                                                                            CornerRadius="2"
+                                                                            Padding="6,3"
+                                                                            VerticalAlignment="Top">
+                                                                        <TextBlock Classes="white"
+                                                                                   FontSize="12"
+                                                                                   Text="{Binding Kind}" />
+                                                                    </Border>
+                                                                </Grid>
+                                                                <TextBlock Classes="white"
+                                                                           FontSize="11"
+                                                                           TextWrapping="Wrap"
+                                                                           Text="{Binding Capabilities.Keying.Count, StringFormat='KEYING OPTIONS: {0}'}" />
+                                                                <TextBlock Classes="white"
+                                                                           FontSize="11"
+                                                                           TextWrapping="Wrap"
+                                                                           Text="{Binding Capabilities.Detect.Count, StringFormat='DETECT OPTIONS: {0}'}" />
+                                                                <TextBlock Classes="white"
+                                                                           FontSize="11"
+                                                                           TextWrapping="Wrap"
+                                                                           Text="Tap-to-add is the next Radio admin step; this list confirms the AP sees the type and that built-in resources are available without plugins." />
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
                                             <Border Classes="panel"
                                                     Padding="10">
                                                 <StackPanel Spacing="6">
@@ -1754,6 +1824,7 @@
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="models:RadioRuntimeEntryMessage">
                                                         <Border Classes="buttonFrame"
+                                                                MaxWidth="560"
                                                                 Margin="0,0,0,8"
                                                                 Padding="10">
                                                             <StackPanel Spacing="8">

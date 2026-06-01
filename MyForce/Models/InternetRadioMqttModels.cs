@@ -19,6 +19,7 @@ internal static class InternetRadioMqttTopics
 {
 	public const string PlayCommandTopic = "myforce/ap/cmd/internet-radio/play";
 	public const string StopCommandTopic = "myforce/ap/cmd/internet-radio/stop";
+	public const string AudioProcessorRegistryTopic = "myforce/ap/registry/service";
 	public const string StateTopic = "myforce/ap/state/internet-radio";
 	public const string AudioFrameworkStateTopic = "myforce/ap/state/audio-framework";
 	public const string RadioRuntimeStateTopic = "myforce/ap/state/radios";
@@ -101,6 +102,22 @@ internal sealed record RoutingStateMessage(
 /// </summary>
 public sealed record RadioRuntimeStateMessage(
 	IReadOnlyList<RadioRuntimeEntryMessage> Radios);
+
+public sealed record AudioProcessorRegistryMessage(
+	string ServiceId,
+	string DisplayName,
+	IReadOnlyList<RadioRegistryEntryMessage> Radios,
+	IReadOnlyList<string> RadioIds,
+	IReadOnlyList<string> BridgeIds);
+
+public sealed record RadioRegistryEntryMessage(
+	string RadioId,
+	string TypeId,
+	string DisplayName,
+	string Kind,
+	RadioCapabilitiesMessage Capabilities,
+	string ConfigSchema,
+	string InstanceSchema);
 
 /// <summary>
 /// Represents one radio entry from the retained AP radio runtime payload.
