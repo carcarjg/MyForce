@@ -1434,20 +1434,20 @@
 
                         <Grid IsVisible="{Binding IsAdminContentVisible}"
                               RowDefinitions="Auto,Auto,*"
-                              RowSpacing="16">
+                              RowSpacing="10">
                             <TextBlock Classes="white"
-                                       FontSize="30"
+                                       FontSize="26"
                                        Text="{Binding AdminSectionTitle}" />
                             <TextBlock Grid.Row="1"
                                        Classes="white"
-                                       FontSize="18"
+                                        FontSize="15"
                                        TextWrapping="Wrap"
                                        Text="{Binding AdminSectionDescription}" />
                             <Border Grid.Row="2"
                                     Classes="panel"
-                                    Padding="14">
+                                    Padding="10">
                                 <Grid RowDefinitions="Auto,Auto,*"
-                                      RowSpacing="12">
+                                      RowSpacing="8">
                                     <TextBlock IsVisible="{Binding IsAdminSystemGeneralSectionSelected}"
                                                Classes="white"
                                                FontSize="18"

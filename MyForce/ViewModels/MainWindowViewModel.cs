@@ -757,7 +757,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	public bool IsAdminSystemStatusSectionSelected => SelectedAdminSection == AdminSection.SystemStatus;
 
-	public bool IsAdminNonSystemSectionSelected => !IsAdminSystemGeneralSectionSelected && !IsAdminSystemStatusSectionSelected;
+	public bool IsAdminNonSystemSectionSelected => SelectedAdminSection is not (AdminSection.System or AdminSection.SystemStatus or AdminSection.Audio);
 
 	// Indicates whether the left directional button is active.
 	public bool IsDirectionalLeftSelected => SelectedDirectional == DirectionalMode.Left;
