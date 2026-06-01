@@ -3,7 +3,7 @@ Diagram_Title ""
 Notes1 
 Notes2 
 Page_Settings_Table Width Height Orientation Pos_X Pos_Y Draw_Scale Fine_Scale Created_By Create_Date Updated_By Update_Date Adjust_X Adjust_Y Page_Locked Default_Zoom
- page_settings 2999 2000 landscape -2 93 0.5 2 ! ! admin 5/30/2026 0 0 Unlocked 100
+ page_settings 2999 2000 landscape -2 93 0.5 2 ! ! admin 6/1/2026 0 0 Unlocked 100
 Colours_Table Bkgnd Link_Text Grid Float_Foregnd Float_Backgnd
  colours &hFFFFFF& &hFF0000& &hFEEDED& &h0& &hC0FFFF&
 Text_Styles_Table Font Size Bold Italic UL ST FColour BColour F_Transpcy B_Transpcy BorderWidth BorderColour BorderTspcy
@@ -33,12 +33,17 @@ Obj_Table Index Type X Y Caption_Lbl Float_text Hyperlink Parent Addr_Lbl X_scal
  object 17 "PC Router" 2438 1010 31 ! ! 0 32 1 1 2 0 0 0 false 112 102 false 0 ! !
  object 18 firewall2 1730 458 33 ! ! 0 34 1 1 2 0 0 0 false 130 57 false 0 ! !
  object 19 DSLAM 1764 710 46 ! ! 0 47 1 1 2 0 0 0 false 91 104 false 0 ! !
- object 20 "Terminal Server2" 1454 726 37 ! ! 0 38 1 1 2 0 0 0 false 78 47 false 0 ! !
+ object 20 "Terminal Server2" 1928 1522 37 ! ! 0 38 1 1 2 0 0 0 false 78 47 false 0 ! !
  object 21 "Security Manager" 1492 1074 39 ! ! 0 40 1 1 2 0 0 0 false 90 82 false 0 ! !
- object 22 "Wireless Gateway" 1956 1204 41 ! ! 0 42 1.64 1.64 2 0 0 0 false 66 200 false 0 ! !
+ object 22 "Wireless Gateway" 2106 1112 41 ! ! 0 42 1.64 1.64 2 0 0 0 false 66 200 false 0 ! !
  object 23 "Call Manager" 1348 284 44 ! ! 0 45 1 1 2 0 0 0 false 174 116 false 0 ! !
- no_object 24
- object 25 "Wireless Gateway" 2184 1364 50 ! ! 0 51 1.64 1.64 2 0 0 0 false 66 200 false 0 ! !
+ object 24 PLC1 1856 1336 48 ! ! 0 0 2 2 2 80 0 0 false 100 120 false 0 ! !
+ object 25 "Wireless Gateway" 2334 1272 50 ! ! 0 51 1.64 1.64 2 0 0 0 false 66 200 false 0 ! !
+ object 26 cloud2 1432 544 49 ! ! 0 52 1 1 2 0 0 0 false 129 80 false 0 ! !
+ object 27 "Terminal Server2" 1502 774 53 ! ! 0 54 1 1 2 0 0 0 false 78 47 false 0 ! !
+ object 28 cloud-filled.wmf 1736 1502 55 ! ! 0 56 2 2 2 0 0 0 false 125 83 false 0 ! !
+ object 29 linknode 2384 886 0 ! ! 0 0 2 2 0 2 0 0 false 16 16 false 0 ! !
+ object 30 "video camera_2.wmf" 1376 1292 57 ! ! 0 58 2 2 2 0 0 0 false 85 123 false 0 ! !
 Label_Table Index X Y Text Font_Name Size Bold Italic UL ST Colour Parent_Object Type Backgnd Locked Rotate Ftranspcy Btranspcy Layer Style Parent_Link Link_pos Link_Seg F_Slope NCB BorderWidth BorderColour BorderTspcy Xoffset Yoffset
  label 1 s 68.5 "MQTT Broker" ! ! ! ! false ! &h0& 1 object ! ! 0 255 0 0 ! 0 0 0 false 0 0 0 255
  label 2 n -55 ! ! ! ! ! false ! &h0& 1 ip ! ! 0 255 0 0 ! 0 0 0 false 8 0 0 255
@@ -82,15 +87,22 @@ Label_Table Index X Y Text Font_Name Size Bold Italic UL ST Colour Parent_Object
  label 40 n -41 ! ! ! ! ! false ! &h0& 21 ip ! ! 0 255 0 0 ! 0 0 0 false 8 0 0 255
  label 41 s 113.5 "SCADA Controller" ! ! ! ! false ! &h0& 22 object ! ! 0 255 0 0 ! 0 0 0 false 0 0 0 255
  label 42 n -100 ! ! ! ! ! false ! &h0& 22 ip ! ! 0 255 0 0 ! 0 0 0 false 8 0 0 255
- label 43 2334 886 libfreerdp "Microsoft Sans Serif" 16 false false false false &h0& 0 ! &hFFFFFF& ! 0 255 0 0 ! 0 0 0 false 8 0 0 255
+ label 43 2334 886 VNC "Microsoft Sans Serif" 16 false false false false &h0& 0 ! &hFFFFFF& ! 0 255 0 0 ! 0 0 0 false 8 0 0 255
  label 44 s 71.5 "Deadicated Speaker OR Car Speaker System" ! ! ! ! false ! &h0& 23 object ! ! 0 255 0 0 ! 0 0 0 false 0 0 0 255
  label 45 n -58 ! ! ! ! ! false ! &h0& 23 ip ! ! 0 255 0 0 ! 0 0 0 false 8 0 0 255
  label 46 s 65.5 "Siren Interface Controller" ! ! ! ! false ! &h0& 19 object ! ! 0 255 0 0 ! 0 0 0 false 0 0 0 255
  label 47 n -52 ! ! ! ! ! false ! &h0& 19 ip ! ! 0 255 0 0 ! 0 0 0 false 8 0 0 255
- no_label 48
- no_label 49
+ label 48 n -73.5 "Vehicle Interface Program" ! ! ! ! false ! &h0& 24 object ! ! 0 255 0 0 ! 0 0 0 false 8 0 0 255
+ label 49 s 53.5 InternetRadio ! ! ! ! false ! &h0& 26 object ! ! 0 255 0 0 ! 0 0 0 false 0 0 0 255
  label 50 s 113.5 "SCADA System" ! ! ! ! false ! &h0& 25 object ! ! 0 255 0 0 ! 0 0 0 false 0 0 0 255
  label 51 n -100 ! ! ! ! ! false ! &h0& 25 ip ! ! 0 255 0 0 ! 0 0 0 false 8 0 0 255
+ label 52 n -40 ! ! ! ! ! false ! &h0& 26 ip ! ! 0 255 0 0 ! 0 0 0 false 8 0 0 255
+ label 53 s 37 RTLSDR ! ! ! ! false ! &h0& 27 object ! ! 0 255 0 0 ! 0 0 0 false 0 0 0 255
+ label 54 n -37 AMFM ! ! ! ! false ! &h0& 27 ip ! ! 0 255 0 0 ! 0 0 0 false 8 0 0 255
+ label 55 s 55 "Car CanBus" ! ! ! ! false ! &h0& 28 object ! ! 0 255 0 0 ! 0 0 0 false 0 0 0 255
+ label 56 n -41.5 ! ! ! ! ! false ! &h0& 28 ip ! ! 0 255 0 0 ! 0 0 0 false 8 0 0 255
+ label 57 s 75 "Panasonic Arbatrator" ! ! ! ! false ! &h0& 30 object ! ! 0 255 0 0 ! 0 0 0 false 0 0 0 255
+ label 58 n -61.5 ! ! ! ! ! false ! &h0& 30 ip ! ! 0 255 0 0 ! 0 0 0 false 8 0 0 255
 Link_Table Index Obj1 Obj2 Style Hostname1_Lbl Hostname2_Lbl Addr1_Lbl Addr2_Lbl Comment1 Comment2 Xoffset1 Yoffset1 Xoffset2 Yoffset2 Node_List Align Layer
  link_object 1 15 2 "SM Fibre" 0 0 0 0 ! ! 0 -12 -4 -4 ! False 3 -1
  link_object 2 2 14 "SM Fibre" 0 0 0 0 ! ! -4 -4 12 -4 ! False 3 -1
@@ -109,12 +121,17 @@ Link_Table Index Obj1 Obj2 Style Hostname1_Lbl Hostname2_Lbl Addr1_Lbl Addr2_Lbl
  link_object 15 9 17 1000BaseT 0 0 0 0 ! ! 40 2 26 -22 ! False 3 -1
  link_object 16 19 1 "MM Fibre" 0 0 0 0 ! ! 2 -10 4 -14 ! False 3 -1
  link_object 17 18 16 1000BaseT 0 0 0 0 ! ! -40 8 -12 4 ! False 3 -1
- link_object 18 2 20 "SM Fibre" 0 0 0 0 ! ! 16 -2 -10 -6 ! False 3 -1
+ link_object 18 2 27 "SM Fibre" 0 0 0 0 ! ! -36 -8 -8 -2 ! False 3 -1
  link_object 19 21 1 "MM Fibre" 0 0 0 0 ! ! 8 -12 -18 -32 ! False 3 -1
  link_object 20 1 22 "MM Fibre" 0 0 0 0 ! ! -22 -16 12 30 ! False 3 -1
  link_object 21 2 23 "SM Fibre" 0 0 0 0 ! ! 26 -14 -26 10 ! False 3 -1
  link_object 22 16 19 10baseT 0 0 0 0 ! ! -6 0 -20 6 ! False 3 -1
  link_object 23 22 25 1000BaseT 0 0 0 0 ! ! 16 -10 4 28 ! False 3 -1
+ link_object 24 1 24 "MM Fibre" 0 0 0 0 ! ! 16 -8 -8 -24 ! False 3 -1
+ link_object 25 2 26 "SM Fibre" 0 0 0 0 ! ! -10 12 -12 -12 ! False 3 -1
+ link_object 26 28 24 "SM Fibre" 0 0 0 0 ! ! 12 -4 -20 6 ! False 3 -1
+ link_object 27 24 20 "SM Fibre" 0 0 0 0 ! ! -20 6 6 0 ! False 3 -1
+ link_object 28 30 21 "Leased Line" 0 0 0 0 ! ! -2 -14 4 -8 ! False 3 -1
 Link_Styles_table Type Format Colour Style Width Misc Angle Style2 Length Endcap Join Startcap Dashcap Transpcy Align Secondary_Style start_cap_type variant width height x y end_cap_type variant width height x y
  define_link 100baseT 0 &h808080& 1 1 9 0 0 0 0 0 0 0 255 False ! 0 0 0 0 0 0 0 0 0 0 0 0 0
  define_link 1000BaseT 0 &h9797FF& 1 1 9 0 0 0 0 0 0 0 255 False ! 0 0 0 0 0 0 0 0 0 0 0 0 0
@@ -131,3 +148,27 @@ Link_Styles_table Type Format Colour Style Width Misc Angle Style2 Length Endcap
  define_link "GRE Tunnel" 0 &hFF& 2 2 9 0 0 0 0 0 0 0 255 False ! 0 0 0 0 0 0 0 0 0 0 0 0 0
  define_link L2TP 0 &h80FF& 2 2 9 0 0 0 0 0 0 0 255 False ! 0 0 0 0 0 0 0 0 0 0 0 0 0
  define_link box 0 &h7C7C7C& 1 2 9 0 0 0 0 0 0 0 255 False ! 0 0 0 0 0 0 0 0 0 0 0 0 0
+Script_Objects_Tables
+ script PLC1 50 60 1.5
+ path name box
+ path addarc 0 0 10 10 180 90
+ path addarc 40 0 10 10 270 90
+ path addarc 40 50 10 10 0 90
+ path addarc 0 50 10 10 90 90
+ path closefigure
+ path name socket
+Path addarc 0 0 27 27 0 360
+ path name pin
+ path addarc 0 0 4 4 0 360
+ path name rj45down
+ path addlines 2 7 2 9 3.5 9 3.5 10 9 10 9 9 10.5 9 10.5 7 12.5 7 12.5 0 0 0 0 7
+ pen box_pen &h000000& 255 1
+ pen socket_pen &h000000& 255 2
+ brush box_brush &hC5E8F1& 255
+ brush pin_brush &h000000& 255
+ fill box box_brush
+ draw box box_pen
+ fill rj45down pin_brush 19 43
+ draw socket socket_pen 12 5
+ fill pin pin_brush 18 17
+ fill pin pin_brush 28 17
