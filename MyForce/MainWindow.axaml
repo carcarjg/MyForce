@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:controls="using:MyForce.Controls"
         xmlns:viewModels="using:MyForce.ViewModels"
         xmlns:models="using:MyForce.Models"
         xmlns:system="clr-namespace:System;assembly=System.Runtime"
@@ -908,18 +909,20 @@
                                                FontSize="16"
                                                VerticalAlignment="Center"
                                                HorizontalAlignment="Right"
-                                               Text="WINDY RADAR FEED" />
+                                               Text="MAP + ACTIVE ALERTS" />
                                 </Grid>
                                 <Border Grid.Row="1"
                                         Classes="panel"
                                         Width="884"
                                         Height="553"
                                         Padding="2">
-                                    <ContentControl x:Name="RadarHostContainer"
-                                                    Width="880"
-                                                    Height="549"
-                                                    HorizontalAlignment="Center"
-                                                    VerticalAlignment="Center" />
+                                    <controls:RadarMapControl Width="880"
+                                                              Height="549"
+                                                              HorizontalAlignment="Center"
+                                                              VerticalAlignment="Center"
+                                                              Latitude="{Binding LocationLatitude}"
+                                                              Longitude="{Binding LocationLongitude}"
+                                                              ZoomLevel="9" />
                                 </Border>
                             </Grid>
                         </Border>

@@ -17,13 +17,10 @@
 //
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
-using Avalonia.Layout;
-using Avalonia.Media;
 using MyForce.ViewModels;
 
 namespace MyForce;
@@ -31,7 +28,6 @@ namespace MyForce;
 public partial class MainWindow : Window
 {
 	private const int AdminTapThreshold = 5;
-	private const string RadarEmbedUrl = "https://embed.windy.com/embed2.html?radar,overlay=radar";
 
 	private static readonly TimeSpan AdminTapWindow = TimeSpan.FromSeconds(20);
 
@@ -44,102 +40,12 @@ public partial class MainWindow : Window
 		InitializeComponent();
 		_viewModel = new MainWindowViewModel();
 		DataContext = _viewModel;
-		InitializeRadarHost();
 	}
 
 	protected override void OnClosed(System.EventArgs e)
 	{
 		_viewModel.Dispose();
 		base.OnClosed(e);
-	}
-
-	private void InitializeRadarHost()
-	{
-		ContentControl? radarHostContainer = this.FindControl<ContentControl>("RadarHostContainer");
-
-		if (radarHostContainer is null)
-		{
-			return;
-		}
-
-		try
-		{
-			Control radarControl = CreateRadarControl();
-			radarHostContainer.Content = radarControl;
-		}
-		catch (Exception)
-		{
-			radarHostContainer.Content = CreateRadarFallback();
-		}
-	}
-
-	private static Control CreateRadarControl()
-	{
-		Type? nativeWebViewType = Type.GetType("Avalonia.Controls.NativeWebView, Avalonia.Controls.WebView", throwOnError: false);
-
-		if (nativeWebViewType is null)
-		{
-			throw new InvalidOperationException("NativeWebView type is not available.");
-		}
-
-		if (Activator.CreateInstance(nativeWebViewType) is not Control control)
-		{
-			throw new InvalidOperationException("Unable to create the radar web view control.");
-		}
-
-		control.Width = 880;
-		control.Height = 549;
-		control.HorizontalAlignment = HorizontalAlignment.Center;
-		control.VerticalAlignment = VerticalAlignment.Center;
-
-		PropertyInfo? sourceProperty = nativeWebViewType.GetProperty("Source", BindingFlags.Instance | BindingFlags.Public);
-
-		if (sourceProperty is null || !sourceProperty.CanWrite)
-		{
-			throw new InvalidOperationException("NativeWebView Source property is not writable.");
-		}
-
-		object sourceValue = sourceProperty.PropertyType == typeof(Uri)
-			? new Uri(RadarEmbedUrl, UriKind.Absolute)
-			: RadarEmbedUrl;
-
-		sourceProperty.SetValue(control, sourceValue);
-		return control;
-	}
-
-	private static Control CreateRadarFallback()
-	{
-		return new Border
-		{
-			Width = 880,
-			Height = 549,
-			Padding = new Thickness(24),
-			Child = new StackPanel
-			{
-				Spacing = 12,
-				VerticalAlignment = VerticalAlignment.Center,
-				HorizontalAlignment = HorizontalAlignment.Center,
-				Children =
-				{
-					new TextBlock
-					{
-						Classes = { "white" },
-						FontSize = 24,
-						TextAlignment = TextAlignment.Center,
-						Text = "Radar view unavailable",
-					},
-					new TextBlock
-					{
-						Classes = { "white" },
-						FontSize = 16,
-						TextAlignment = TextAlignment.Center,
-						Text = "Install the required Linux WebKit/WPE runtime packages to enable the live radar panel.",
-						TextWrapping = TextWrapping.Wrap,
-						MaxWidth = 520,
-					},
-				},
-			},
-		};
 	}
 
 	private void OnChannelUpPressed(object? sender, PointerPressedEventArgs e)

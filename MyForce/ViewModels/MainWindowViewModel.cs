@@ -139,6 +139,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	private readonly MqttConnectionService _mqttConnectionService;
 
+	private double _locationLatitude = 30.5422d;
+
+	private double _locationLongitude = -97.6384d;
+
 	private string _clock = string.Empty;
 
 	private string _date = string.Empty;
@@ -293,7 +297,37 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	public string LocationLabel => "LOCATION";
 
-	public string LocationValue => "30.5422, -97.6384";
+	public double LocationLatitude
+	{
+		get => _locationLatitude;
+		set
+		{
+			if (!SetProperty(ref _locationLatitude, value))
+			{
+				return;
+			}
+
+			PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LocationValue)));
+		}
+	}
+
+	public double LocationLongitude
+	{
+		get => _locationLongitude;
+		set
+		{
+			if (!SetProperty(ref _locationLongitude, value))
+			{
+				return;
+			}
+
+			PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LocationValue)));
+		}
+	}
+
+	public string LocationValue => string.Create(
+		CultureInfo.InvariantCulture,
+		$"{LocationLatitude:0.0000}, {LocationLongitude:0.0000}");
 
 	public string CurrentTalkRadio
 	{
