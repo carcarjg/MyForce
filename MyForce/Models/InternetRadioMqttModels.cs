@@ -1,5 +1,24 @@
+// %%%%%%    @%%%%%@
+//%%%%%%%%   %%%%%%%@
+//@%%%%%%%@  %%%%%%%%%        @@      @@  @@@      @@@ @@@     @@@ @@@@@@@@@@   @@@@@@@@@
+//%%%%%%%%@ @%%%%%%%%       @@@@@   @@@@ @@@@@   @@@@ @@@@   @@@@ @@@@@@@@@@@@@@@@@@@@@@@ @@@@
+// @%%%%%%%%  %%%%%%%%%      @@@@@@  @@@@  @@@@  @@@@   @@@@@@@@@     @@@@    @@@@         @@@@
+//  %%%%%%%%%  %%%%%%%%@     @@@@@@@ @@@@   @@@@@@@@     @@@@@@       @@@@    @@@@@@@@@@@  @@@@
+//   %%%%%%%%@  %%%%%%%%%    @@@@@@@@@@@@     @@@@        @@@@@       @@@@    @@@@@@@@@@@  @@@@
+//    %%%%%%%%@ @%%%%%%%%    @@@@ @@@@@@@     @@@@      @@@@@@@@      @@@@    @@@@         @@@@
+//    @%%%%%%%%% @%%%%%%%%   @@@@   @@@@@     @@@@     @@@@@ @@@@@    @@@@    @@@@@@@@@@@@ @@@@@@@@@@
+//     @%%%%%%%%  %%%%%%%%@  @@@@    @@@@     @@@@    @@@@     @@@@   @@@@    @@@@@@@@@@@@ @@@@@@@@@@@
+//      %%%%%%%%@ @%%%%%%%%
+//      @%%%%%%%%  @%%%%%%%%
+//       %%%%%%%%   %%%%%%%@
+//         %%%%%      %%%%
+//
+// Copyright (C) 2025-2026 NyxTel Wireless / Nyx Gallini
+//
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace MyForce.Models;
 
@@ -18,13 +37,24 @@ internal sealed record MqttCommandEnvelope(
 internal static class InternetRadioMqttTopics
 {
 	public const string PlayCommandTopic = "myforce/ap/cmd/internet-radio/play";
+
 	public const string StopCommandTopic = "myforce/ap/cmd/internet-radio/stop";
+
 	public const string AudioProcessorRegistryTopic = "myforce/ap/registry/service";
+
 	public const string StateTopic = "myforce/ap/state/internet-radio";
+
 	public const string AudioFrameworkStateTopic = "myforce/ap/state/audio-framework";
+
 	public const string RadioRuntimeStateTopic = "myforce/ap/state/radios";
+
 	public const string RoutingStateTopic = "myforce/ap/state/routing";
+
 	public const string SpeakerOutputCommandTopic = "myforce/ap/cmd/output-speaker";
+	public const string SystemPluginsTopic = "myforce/sys/plugins";
+	public const string SystemDefinitionTopic = "myforce/sys/definition";
+	public const string ModuleTopicFilter = "myforce/module/+/+";
+	public const string ConsoleTxTopic = "myforce/console/tx";
 }
 
 /// <summary>
@@ -175,3 +205,42 @@ public sealed record RadioTxStateMessage(
 	int PttLeadMs,
 	int PttTailMs,
 	DateTimeOffset LastTransitionUtc);
+
+internal sealed record ModuleRegistrySpecMessage(
+	int V,
+	DateTimeOffset Ts,
+	string Id,
+	[property: JsonPropertyName("type_id")] string TypeId,
+	string Kind,
+	string Category,
+	bool Removable,
+	[property: JsonPropertyName("config_schema")] JsonElement ConfigSchema,
+	RadioCapabilitiesMessage Capabilities);
+
+internal sealed record ModuleStatusSpecMessage(
+	int V,
+	DateTimeOffset Ts,
+	string Id,
+	bool Online,
+	string Health,
+	string? Reason);
+
+internal sealed record ModuleRadioStateSpecMessage(
+	int V,
+	DateTimeOffset Ts,
+	string Id,
+	[property: JsonPropertyName("rx_active")] bool RxActive,
+	[property: JsonPropertyName("tx_active")] bool TxActive,
+	[property: JsonPropertyName("tx_source")] string? TxSource,
+	ChannelInfoMessage? Channel,
+	ZoneInfoMessage? Zone,
+	string? Mode,
+	SignalInfoMessage? Signal);
+
+internal sealed record ChannelInfoMessage(int Index, string? Label);
+
+internal sealed record ZoneInfoMessage(int Index, string? Label);
+
+internal sealed record SignalInfoMessage([property: JsonPropertyName("rssi_dbm")] int? RssiDbm);
+
+internal sealed record ConsoleTxStateMessage(int V, DateTimeOffset Ts, string? Holder, string? Target, string State);

@@ -110,6 +110,17 @@
             <Setter Property="FontWeight" Value="Bold" />
         </Style>
 
+        <Style Selector="Border.connectionBanner">
+            <Setter Property="Background" Value="#B00020" />
+            <Setter Property="BorderBrush" Value="#FFB4AB" />
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Margin" Value="16" />
+        </Style>
+
         <Style Selector="Expander.adminMenu">
             <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
             <Setter Property="Background" Value="#161616" />
@@ -120,6 +131,15 @@
     </Window.Styles>
 
     <Grid Background="{StaticResource ShellBrush}">
+        <Border Classes="connectionBanner"
+                IsVisible="{Binding IsMqttConnectionBannerVisible}"
+                ZIndex="10">
+            <TextBlock Classes="white"
+                       FontSize="18"
+                       TextAlignment="Center"
+                       Text="{Binding MqttConnectionBannerText}" />
+        </Border>
+
         <Viewbox Stretch="Fill"
                  StretchDirection="DownOnly">
             <Grid Width="1280"

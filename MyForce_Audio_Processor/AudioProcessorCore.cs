@@ -16,6 +16,7 @@
 // Copyright (C) 2025-2026 NyxTel Wireless / Nyx Gallini
 //
 using System.Buffers;
+using System.Globalization;
 using System.Runtime.Loader;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -24,12 +25,17 @@ using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using MQTTnet;
 using NAudio.Wave;
 using MyForce.Contracts.Radio;
 
 internal sealed class AudioProcessorCoordinator : IAsyncDisposable
 {
+	private const string AdminCredential = "2135";
+
+	private const string VipPttOrigin = "vip";
+
 	private readonly AudioProcessorRegistry _registry;
 
 	private readonly AudioFrameworkCatalog _audioFramework;
@@ -77,6 +83,7 @@ internal sealed class AudioProcessorCoordinator : IAsyncDisposable
 	public async Task StartAsync(CancellationToken cancellationToken)
 	{
 		await _mqttRuntime.SubscribeAsync(_topics.AllCommandsTopicFilter, cancellationToken).ConfigureAwait(false);
+		await _mqttRuntime.SubscribeAsync(_topics.ConsolePttCommandTopicFilter, cancellationToken).ConfigureAwait(false);
 		await RestoreInternetRadioPlaybackAsync(cancellationToken).ConfigureAwait(false);
 		await PublishBirthSnapshotAsync(cancellationToken).ConfigureAwait(false);
 	}
@@ -102,6 +109,53 @@ internal static class AudioProcessorPluginDirectory
 		}
 
 		return Path.Combine(AppContext.BaseDirectory, PluginDirectoryName);
+	}
+}
+
+internal sealed record ModuleRadioStateSpecPayload(
+	int V,
+	DateTimeOffset Ts,
+	string Id,
+	[property: JsonPropertyName("rx_active")] bool RxActive,
+	[property: JsonPropertyName("tx_active")] bool TxActive,
+	[property: JsonPropertyName("tx_source")] string TxSource,
+	ChannelInfo? Channel,
+	ZoneInfo? Zone,
+	string? Mode,
+	SignalInfo? Signal)
+{
+	public static ModuleRadioStateSpecPayload Create(RadioRuntimeDefinition radio, RadioTxState state)
+	{
+		ArgumentNullException.ThrowIfNull(radio);
+		ArgumentNullException.ThrowIfNull(state);
+
+		var isTxActive = state.State is TxStatePhase.Keying or TxStatePhase.Transmitting or TxStatePhase.Tail;
+		return new ModuleRadioStateSpecPayload(
+			1,
+			DateTimeOffset.UtcNow,
+			radio.Id.Value,
+			RxActive: false,
+			TxActive: isTxActive,
+			TxSource: isTxActive ? "manual" : "idle",
+			Channel: null,
+			Zone: null,
+			Mode: null,
+			Signal: null);
+	}
+}
+
+internal sealed record ConsoleTxStatePayload(
+	int V,
+	DateTimeOffset Ts,
+	string? Holder,
+	string? Target,
+	string State)
+{
+	public static ConsoleTxStatePayload Create(TxController txController)
+	{
+		ArgumentNullException.ThrowIfNull(txController);
+		var target = txController.ActiveManualTransmitRadioId?.Value;
+		return new ConsoleTxStatePayload(1, DateTimeOffset.UtcNow, target is null ? null : "vip", target, target is null ? "idle" : "active");
 	}
 }
 
@@ -261,6 +315,7 @@ internal sealed record RelaySetDefinition(
 	public async Task HandleConnectedAsync(CancellationToken cancellationToken)
 	{
 		await _mqttRuntime.SubscribeAsync(_topics.AllCommandsTopicFilter, cancellationToken).ConfigureAwait(false);
+		await _mqttRuntime.SubscribeAsync(_topics.ConsolePttCommandTopicFilter, cancellationToken).ConfigureAwait(false);
 		await PublishHeartbeatAsync(cancellationToken).ConfigureAwait(false);
 	}
 
@@ -276,6 +331,13 @@ internal sealed record RelaySetDefinition(
 
 		if (string.Equals(topic, _topics.OutputSpeakerCommandTopic, StringComparison.OrdinalIgnoreCase))
 		{
+			var msgId = GetMessageId(args.ApplicationMessage.Payload);
+			if (!ValidateAdminCommand(args.ApplicationMessage.Payload, topic))
+			{
+				await PublishCommandAckAsync(topic, msgId, "rejected", "auth", "invalid_auth", "Admin authentication is required.").ConfigureAwait(false);
+				return;
+			}
+
 			var command = AudioProcessorJson.Deserialize<OutputSpeakerCommand>(args.ApplicationMessage.Payload);
 			if (command is null)
 			{
@@ -285,11 +347,19 @@ internal sealed record RelaySetDefinition(
 			ApplyOutputSpeaker(command.DeviceId);
 			await PublishRoutingStateAsync(CancellationToken.None).ConfigureAwait(false);
 			await PublishInternetRadioStateAsync(CancellationToken.None).ConfigureAwait(false);
+			await PublishCommandAckAsync(topic, msgId, "ok", null, null, null).ConfigureAwait(false);
 			return;
 		}
 
 		if (string.Equals(topic, _topics.AudioOutputConfigCommandTopic, StringComparison.OrdinalIgnoreCase))
 		{
+			var msgId = GetMessageId(args.ApplicationMessage.Payload);
+			if (!ValidateAdminCommand(args.ApplicationMessage.Payload, topic))
+			{
+				await PublishCommandAckAsync(topic, msgId, "rejected", "auth", "invalid_auth", "Admin authentication is required.").ConfigureAwait(false);
+				return;
+			}
+
 			var command = AudioProcessorJson.Deserialize<AudioOutputConfigCommand>(args.ApplicationMessage.Payload);
 			if (command is null)
 			{
@@ -299,12 +369,14 @@ internal sealed record RelaySetDefinition(
 			ApplyAudioOutputConfig(command);
 			await PublishRoutingStateAsync(CancellationToken.None).ConfigureAwait(false);
 			await PublishInternetRadioStateAsync(CancellationToken.None).ConfigureAwait(false);
+			await PublishCommandAckAsync(topic, msgId, "ok", null, null, null).ConfigureAwait(false);
 			return;
 		}
 
-		if (string.Equals(topic, _topics.ManualPttRequestTopic, StringComparison.OrdinalIgnoreCase))
+		if (string.Equals(topic, _topics.ManualPttRequestTopic, StringComparison.OrdinalIgnoreCase)
+			|| IsConsolePttTopic(topic))
 		{
-			var request = AudioProcessorJson.Deserialize<ManualPttRequest>(args.ApplicationMessage.Payload);
+			var request = CreateManualPttRequest(topic, args.ApplicationMessage.Payload);
 			if (request is null)
 			{
 				return;
@@ -313,11 +385,19 @@ internal sealed record RelaySetDefinition(
 			ApplyManualPtt(request);
 			await PublishMixerStateAsync(CancellationToken.None).ConfigureAwait(false);
 			await PublishStatusAsync(CancellationToken.None).ConfigureAwait(false);
+			await PublishCommandAckAsync(topic, request.MsgId, "ok", null, null, null).ConfigureAwait(false);
 			return;
 		}
 
 		if (string.Equals(topic, _topics.ChannelGainCommandTopic, StringComparison.OrdinalIgnoreCase))
 		{
+			var msgId = GetMessageId(args.ApplicationMessage.Payload);
+			if (!ValidateAdminCommand(args.ApplicationMessage.Payload, topic))
+			{
+				await PublishCommandAckAsync(topic, msgId, "rejected", "auth", "invalid_auth", "Admin authentication is required.").ConfigureAwait(false);
+				return;
+			}
+
 			var command = AudioProcessorJson.Deserialize<AudioChannelGainCommand>(args.ApplicationMessage.Payload);
 			if (command is null)
 			{
@@ -327,11 +407,19 @@ internal sealed record RelaySetDefinition(
 			_mixerState.SetGain(command.ChannelId, command.Gain);
 			_internetRadioController.SetOutputGain(command.ChannelId, command.Gain);
 			await PublishMixerStateAsync(CancellationToken.None).ConfigureAwait(false);
+			await PublishCommandAckAsync(topic, msgId, "ok", null, null, null).ConfigureAwait(false);
 			return;
 		}
 
 		if (string.Equals(topic, _topics.ChannelMuteCommandTopic, StringComparison.OrdinalIgnoreCase))
 		{
+			var msgId = GetMessageId(args.ApplicationMessage.Payload);
+			if (!ValidateAdminCommand(args.ApplicationMessage.Payload, topic))
+			{
+				await PublishCommandAckAsync(topic, msgId, "rejected", "auth", "invalid_auth", "Admin authentication is required.").ConfigureAwait(false);
+				return;
+			}
+
 			var command = AudioProcessorJson.Deserialize<AudioChannelMuteCommand>(args.ApplicationMessage.Payload);
 			if (command is null)
 			{
@@ -340,11 +428,13 @@ internal sealed record RelaySetDefinition(
 
 			_mixerState.SetMuted(command.ChannelId, command.IsMuted);
 			await PublishMixerStateAsync(CancellationToken.None).ConfigureAwait(false);
+			await PublishCommandAckAsync(topic, msgId, "ok", null, null, null).ConfigureAwait(false);
 			return;
 		}
 
 		if (string.Equals(topic, _topics.InternetRadioPlayCommandTopic, StringComparison.OrdinalIgnoreCase))
 		{
+			var msgId = GetMessageId(args.ApplicationMessage.Payload);
 			var command = AudioProcessorJson.Deserialize<InternetRadioPlayCommand>(args.ApplicationMessage.Payload);
 			if (command is null)
 			{
@@ -353,14 +443,58 @@ internal sealed record RelaySetDefinition(
 
 			await _internetRadioController.PlayAsync(command, CancellationToken.None).ConfigureAwait(false);
 			await PublishInternetRadioStateAsync(CancellationToken.None).ConfigureAwait(false);
+			await PublishCommandAckAsync(topic, msgId, "ok", null, null, null).ConfigureAwait(false);
 			return;
 		}
 
 		if (string.Equals(topic, _topics.InternetRadioStopCommandTopic, StringComparison.OrdinalIgnoreCase))
 		{
+			var msgId = GetMessageId(args.ApplicationMessage.Payload);
 			_internetRadioController.Stop();
 			await PublishInternetRadioStateAsync(CancellationToken.None).ConfigureAwait(false);
+			await PublishCommandAckAsync(topic, msgId, "ok", null, null, null).ConfigureAwait(false);
 		}
+	}
+
+	private async Task PublishCommandAckAsync(string commandTopic, string? msgId, string status, string? field, string? code, string? message)
+	{
+		if (string.IsNullOrWhiteSpace(msgId))
+		{
+			return;
+		}
+
+		var errors = string.Equals(status, "ok", StringComparison.OrdinalIgnoreCase)
+			? null
+			: new[] { new CommandAckErrorPayload(field, code ?? status, message ?? status) };
+		var ack = new CommandAckPayload(1, DateTimeOffset.UtcNow, msgId, status, errors);
+		await _mqttRuntime.PublishAsync(
+			$"{commandTopic}/ack",
+			AudioProcessorJson.Serialize(ack),
+			retain: false,
+			cancellationToken: CancellationToken.None).ConfigureAwait(false);
+	}
+
+	private static string? GetMessageId(ReadOnlySequence<byte> payload)
+	{
+		return AudioProcessorJson.Deserialize<MqttCommandEnvelope>(payload)?.MsgId;
+	}
+
+	private bool ValidateAdminCommand(ReadOnlySequence<byte> payload, string topic)
+	{
+		var envelope = AudioProcessorJson.Deserialize<MqttCommandEnvelope>(payload);
+		if (string.Equals(envelope?.Auth, AdminCredential, StringComparison.Ordinal))
+		{
+			return true;
+		}
+
+		AudioProcessorLog.Write("auth", $"Rejected admin command on '{topic}' because the auth credential was missing or invalid.");
+		return false;
+	}
+
+	private static bool IsConsolePttTopic(string topic)
+	{
+		return topic.StartsWith("myforce/console/", StringComparison.OrdinalIgnoreCase)
+			&& topic.EndsWith("/cmd/ptt", StringComparison.OrdinalIgnoreCase);
 	}
 
 	private async Task RestoreInternetRadioPlaybackAsync(CancellationToken cancellationToken)
@@ -439,6 +573,12 @@ internal sealed record RelaySetDefinition(
 	{
 		ArgumentNullException.ThrowIfNull(request);
 
+		if (!string.Equals(request.Origin, VipPttOrigin, StringComparison.OrdinalIgnoreCase))
+		{
+			AudioProcessorLog.Write("tx", $"Manual PTT rejected for '{request.RadioId.Value}' because origin '{request.Origin ?? "<missing>"}' is not authorized.");
+			return;
+		}
+
 		if (request.IsPressed)
 		{
 			var startResult = _txController.BeginManualTransmit(request.RadioId);
@@ -472,8 +612,52 @@ internal sealed record RelaySetDefinition(
 		}
 	}
 
+	private ManualPttRequest? CreateManualPttRequest(string topic, ReadOnlySequence<byte> payload)
+	{
+		if (!IsConsolePttTopic(topic))
+		{
+			return AudioProcessorJson.Deserialize<ManualPttRequest>(payload);
+		}
+
+		var request = AudioProcessorJson.Deserialize<ConsolePttRequest>(payload);
+		if (request is null)
+		{
+			return null;
+		}
+
+		if (string.IsNullOrWhiteSpace(request.Target))
+		{
+			AudioProcessorLog.Write("tx", "Console PTT rejected because target is missing.");
+			return null;
+		}
+
+		var isPressed = request.State switch
+		{
+			"down" => true,
+			"up" => false,
+			_ => (bool?)null
+		};
+
+		if (isPressed is null)
+		{
+			AudioProcessorLog.Write("tx", $"Console PTT rejected because state '{request.State}' is not supported.");
+			return null;
+		}
+
+		return new ManualPttRequest(
+			new RadioId(request.Target),
+			isPressed.Value,
+			request.Origin,
+			request.V.ToString(CultureInfo.InvariantCulture),
+			request.Ts,
+			request.MsgId,
+			request.Auth);
+	}
+
 	private async Task PublishBirthSnapshotAsync(CancellationToken cancellationToken)
 	{
+		await PublishSpecSystemTopicsAsync(cancellationToken).ConfigureAwait(false);
+
 		await _mqttRuntime.PublishAsync(
 			_topics.ServiceRegistryTopic,
 			AudioProcessorJson.Serialize(ServiceRegistryPayload.Create(_registry)),
@@ -534,6 +718,21 @@ internal sealed record RelaySetDefinition(
 		await PublishRadioRuntimeAsync(cancellationToken).ConfigureAwait(false);
 	}
 
+	private async Task PublishSpecSystemTopicsAsync(CancellationToken cancellationToken)
+	{
+		await _mqttRuntime.PublishAsync(
+			_topics.SystemPluginsTopic,
+			AudioProcessorJson.Serialize(SystemPluginsPayload.Create(_registry)),
+			retain: true,
+			cancellationToken: cancellationToken).ConfigureAwait(false);
+
+		await _mqttRuntime.PublishAsync(
+			_topics.SystemDefinitionTopic,
+			AudioProcessorJson.Serialize(SystemDefinitionPayload.Create(_registry)),
+			retain: true,
+			cancellationToken: cancellationToken).ConfigureAwait(false);
+	}
+
 	/// <summary>
 	/// Publishes retained per-radio config, capabilities, and runtime TX state for dynamic admin consumers.
 	/// </summary>
@@ -542,6 +741,39 @@ internal sealed record RelaySetDefinition(
 		await _mqttRuntime.PublishAsync(
 			_topics.RadioRuntimeTopic,
 			AudioProcessorJson.Serialize(RadioRuntimePayload.Create(_registry, _txController)),
+			retain: true,
+			cancellationToken: cancellationToken).ConfigureAwait(false);
+
+		foreach (var radio in _registry.Radios)
+		{
+			await _mqttRuntime.PublishAsync(
+				_topics.ModuleRegistryTopic(radio.Id),
+				AudioProcessorJson.Serialize(ModuleRegistrySpecPayload.Create(radio)),
+				retain: true,
+				cancellationToken: cancellationToken).ConfigureAwait(false);
+
+			await _mqttRuntime.PublishAsync(
+				_topics.ModuleConfigTopic(radio.Id),
+				AudioProcessorJson.Serialize(ModuleConfigSpecPayload.Create(radio)),
+				retain: true,
+				cancellationToken: cancellationToken).ConfigureAwait(false);
+
+			await _mqttRuntime.PublishAsync(
+				_topics.ModuleStatusTopic(radio.Id),
+				AudioProcessorJson.Serialize(ModuleStatusSpecPayload.CreateOnline(radio)),
+				retain: true,
+				cancellationToken: cancellationToken).ConfigureAwait(false);
+
+			await _mqttRuntime.PublishAsync(
+				_topics.ModuleStateTopic(radio.Id),
+				AudioProcessorJson.Serialize(ModuleRadioStateSpecPayload.Create(radio, _txController.GetState(radio.Id))),
+				retain: true,
+				cancellationToken: cancellationToken).ConfigureAwait(false);
+		}
+
+		await _mqttRuntime.PublishAsync(
+			_topics.ConsoleTxTopic,
+			AudioProcessorJson.Serialize(ConsoleTxStatePayload.Create(_txController)),
 			retain: true,
 			cancellationToken: cancellationToken).ConfigureAwait(false);
 	}
@@ -941,7 +1173,45 @@ internal sealed class AudioProcessorTopicFactory
 {
 	private const string RootTopic = "myforce/ap";
 
+	private const string ConsoleRootTopic = "myforce/console";
+
+	private const string SystemRootTopic = "myforce/sys";
+
+	private const string ModuleRootTopic = "myforce/module";
+
 	public string AllCommandsTopicFilter => $"{RootTopic}/cmd/#";
+
+	public string ConsolePttCommandTopicFilter => $"{ConsoleRootTopic}/+/cmd/ptt";
+
+	public string SystemPluginsTopic => $"{SystemRootTopic}/plugins";
+
+	public string SystemDefinitionTopic => $"{SystemRootTopic}/definition";
+
+	public string ConsoleTxTopic => $"{ConsoleRootTopic}/tx";
+
+	public string ModuleRegistryTopic(RadioId radioId)
+	{
+		ArgumentNullException.ThrowIfNull(radioId);
+		return $"{ModuleRootTopic}/{radioId.Value}/registry";
+	}
+
+	public string ModuleConfigTopic(RadioId radioId)
+	{
+		ArgumentNullException.ThrowIfNull(radioId);
+		return $"{ModuleRootTopic}/{radioId.Value}/config";
+	}
+
+	public string ModuleStatusTopic(RadioId radioId)
+	{
+		ArgumentNullException.ThrowIfNull(radioId);
+		return $"{ModuleRootTopic}/{radioId.Value}/status";
+	}
+
+	public string ModuleStateTopic(RadioId radioId)
+	{
+		ArgumentNullException.ThrowIfNull(radioId);
+		return $"{ModuleRootTopic}/{radioId.Value}/state";
+	}
 
 	public string ManualPttRequestTopic => $"{RootTopic}/cmd/manual-ptt";
 
@@ -1470,7 +1740,29 @@ internal sealed record SinkEndpoint(string Kind, string? RadioId = null)
 	}
 }
 
-internal sealed record ManualPttRequest(RadioId RadioId, bool IsPressed);
+internal sealed record ManualPttRequest(RadioId RadioId, bool IsPressed, string? Origin, string? V, DateTimeOffset? Ts, string? MsgId, string? Auth);
+
+internal sealed class ConsolePttRequest
+{
+	public int V { get; init; }
+
+	public DateTimeOffset Ts { get; init; }
+
+	[JsonPropertyName("msg_id")]
+	public string? MsgId { get; init; }
+
+	public string? Auth { get; init; }
+
+	public string Target { get; init; } = string.Empty;
+
+	public string State { get; init; } = string.Empty;
+
+	public string Origin { get; init; } = string.Empty;
+
+	public bool? Override { get; init; }
+}
+
+internal sealed record MqttCommandEnvelope(string? V, DateTimeOffset? Ts, string? MsgId, string? Auth);
 
 internal sealed record AudioChannelGainCommand(string ChannelId, decimal Gain);
 
@@ -1508,6 +1800,126 @@ internal sealed record ServiceRegistryPayload(
 				radio.InstanceSchema)).ToArray(),
 			RadioIds: registry.RadioIds.Select(static radioId => radioId.Value).ToArray(),
 			BridgeIds: registry.Bridges.Select(static bridge => bridge.Id.Value).ToArray());
+	}
+}
+
+internal sealed record MqttEnvelopePayload(int V, DateTimeOffset Ts, [property: JsonPropertyName("msg_id")] string? MsgId = null, string? Auth = null)
+{
+	public static MqttEnvelopePayload Create(string? msgId = null, string? auth = null) => new(1, DateTimeOffset.UtcNow, msgId, auth);
+}
+
+internal sealed record CommandAckPayload(
+	int V,
+	DateTimeOffset Ts,
+	[property: JsonPropertyName("msg_id")] string MsgId,
+	string Status,
+	IReadOnlyList<CommandAckErrorPayload>? Errors);
+
+internal sealed record CommandAckErrorPayload(string? Field, string Code, string Message);
+
+internal sealed record SystemPluginsPayload(int V, DateTimeOffset Ts, IReadOnlyList<SystemPluginTypePayload> Types)
+{
+	public static SystemPluginsPayload Create(AudioProcessorRegistry registry)
+	{
+		ArgumentNullException.ThrowIfNull(registry);
+
+		var builtInTypes = registry.Radios
+			.Select(static radio => new SystemPluginTypePayload(
+				TypeId: radio.TypeId,
+				DisplayName: radio.DisplayName,
+				Kind: radio.Kind == RadioRuntimeKind.Resource ? "radio_resource" : "radio_module",
+				Version: radio.Kind == RadioRuntimeKind.Resource ? "core" : "built-in"));
+
+		return new SystemPluginsPayload(1, DateTimeOffset.UtcNow, builtInTypes.ToArray());
+	}
+}
+
+internal sealed record SystemPluginTypePayload(
+	[property: JsonPropertyName("type_id")] string TypeId,
+	[property: JsonPropertyName("display_name")] string DisplayName,
+	string Kind,
+	string Version);
+
+internal sealed record SystemDefinitionPayload(
+	int V,
+	DateTimeOffset Ts,
+	IReadOnlyList<SystemDefinitionModulePayload> Modules,
+	IReadOnlyList<SystemDefinitionBridgePayload> Bridges,
+	IReadOnlyList<SystemDefinitionConsolePayload> Consoles)
+{
+	public static SystemDefinitionPayload Create(AudioProcessorRegistry registry)
+	{
+		ArgumentNullException.ThrowIfNull(registry);
+
+		return new SystemDefinitionPayload(
+			1,
+			DateTimeOffset.UtcNow,
+			registry.Radios.Select(static radio => new SystemDefinitionModulePayload(
+				Id: radio.Id.Value,
+				TypeId: radio.TypeId,
+				Alias: radio.DisplayName,
+				Category: "radio",
+				Required: radio.Kind == RadioRuntimeKind.Resource)).ToArray(),
+			registry.Bridges.Select(static bridge => new SystemDefinitionBridgePayload(bridge.Id.Value, bridge.Id.Value)).ToArray(),
+			[new SystemDefinitionConsolePayload("vip", "Vehicle Interface")]);
+	}
+}
+
+internal sealed record SystemDefinitionModulePayload(
+	string Id,
+	[property: JsonPropertyName("type_id")] string TypeId,
+	string Alias,
+	string Category,
+	bool Required);
+
+internal sealed record SystemDefinitionBridgePayload(string Id, string Alias);
+
+internal sealed record SystemDefinitionConsolePayload(string Id, string Alias);
+
+internal sealed record ModuleRegistrySpecPayload(
+	int V,
+	DateTimeOffset Ts,
+	string Id,
+	[property: JsonPropertyName("type_id")] string TypeId,
+	string Kind,
+	string Category,
+	bool Removable,
+	[property: JsonPropertyName("config_schema")] JsonObject ConfigSchema,
+	RadioCapabilities Capabilities)
+{
+	public static ModuleRegistrySpecPayload Create(RadioRuntimeDefinition radio)
+	{
+		ArgumentNullException.ThrowIfNull(radio);
+
+		var configSchema = JsonNode.Parse(radio.InstanceSchema) as JsonObject ?? [];
+		return new ModuleRegistrySpecPayload(
+			1,
+			DateTimeOffset.UtcNow,
+			radio.Id.Value,
+			radio.TypeId,
+			radio.Kind == RadioRuntimeKind.Resource ? "radio_resource" : "radio_module",
+			"radio",
+			radio.Kind != RadioRuntimeKind.Resource,
+			configSchema,
+			radio.Capabilities);
+	}
+}
+
+internal sealed record ModuleConfigSpecPayload(int V, DateTimeOffset Ts, string Id, RadioInstanceConfigPayload Config)
+{
+	public static ModuleConfigSpecPayload Create(RadioRuntimeDefinition radio)
+	{
+		ArgumentNullException.ThrowIfNull(radio);
+		return new ModuleConfigSpecPayload(1, DateTimeOffset.UtcNow, radio.Id.Value, RadioInstanceConfigPayload.Create(radio.Config));
+	}
+}
+
+internal sealed record ModuleStatusSpecPayload(int V, DateTimeOffset Ts, string Id, bool Online, string Health, string? Reason)
+{
+	public static ModuleStatusSpecPayload CreateOnline(RadioRuntimeDefinition radio)
+	{
+		ArgumentNullException.ThrowIfNull(radio);
+		return new ModuleStatusSpecPayload(1, DateTimeOffset.UtcNow, radio.Id.Value, true, "available", null);
 	}
 }
 

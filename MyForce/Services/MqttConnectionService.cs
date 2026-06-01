@@ -136,6 +136,7 @@ internal sealed class MqttConnectionService : IDisposable
         var message = new MqttApplicationMessageBuilder()
             .WithTopic(topic)
             .WithPayload(payload)
+            .WithQualityOfServiceLevel(MQTTnet.Protocol.MqttQualityOfServiceLevel.AtLeastOnce)
             .WithRetainFlag(retain)
             .Build();
 
@@ -219,7 +220,7 @@ internal sealed class MqttConnectionService : IDisposable
     private async Task SubscribeCoreAsync(string topicFilter, CancellationToken cancellationToken)
     {
         var subscribeOptions = new MqttClientSubscribeOptionsBuilder()
-            .WithTopicFilter(topicFilter)
+            .WithTopicFilter(topicFilter, MQTTnet.Protocol.MqttQualityOfServiceLevel.AtLeastOnce)
             .Build();
 
         try

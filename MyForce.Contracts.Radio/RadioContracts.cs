@@ -1,3 +1,20 @@
+// %%%%%%    @%%%%%@
+//%%%%%%%%   %%%%%%%@
+//@%%%%%%%@  %%%%%%%%%        @@      @@  @@@      @@@ @@@     @@@ @@@@@@@@@@   @@@@@@@@@
+//%%%%%%%%@ @%%%%%%%%       @@@@@   @@@@ @@@@@   @@@@ @@@@   @@@@ @@@@@@@@@@@@@@@@@@@@@@@ @@@@
+// @%%%%%%%%  %%%%%%%%%      @@@@@@  @@@@  @@@@  @@@@   @@@@@@@@@     @@@@    @@@@         @@@@
+//  %%%%%%%%%  %%%%%%%%@     @@@@@@@ @@@@   @@@@@@@@     @@@@@@       @@@@    @@@@@@@@@@@  @@@@
+//   %%%%%%%%@  %%%%%%%%%    @@@@@@@@@@@@     @@@@        @@@@@       @@@@    @@@@@@@@@@@  @@@@
+//    %%%%%%%%@ @%%%%%%%%    @@@@ @@@@@@@     @@@@      @@@@@@@@      @@@@    @@@@         @@@@
+//    @%%%%%%%%% @%%%%%%%%   @@@@   @@@@@     @@@@     @@@@@ @@@@@    @@@@    @@@@@@@@@@@@ @@@@@@@@@@
+//     @%%%%%%%%  %%%%%%%%@  @@@@    @@@@     @@@@    @@@@     @@@@   @@@@    @@@@@@@@@@@@ @@@@@@@@@@@
+//      %%%%%%%%@ @%%%%%%%%
+//      @%%%%%%%%  @%%%%%%%%
+//       %%%%%%%%   %%%%%%%@
+//         %%%%%      %%%%
+//
+// Copyright (C) 2025-2026 NyxTel Wireless / Nyx Gallini
+//
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -41,6 +58,8 @@ public interface IRadioModule : IAsyncDisposable
 	JsonObject GetConfig();
 
 	Task StartAsync(CancellationToken cancellationToken);
+
+	Task<OperationResult> ExecuteControlAsync(string action, JsonObject? args, CancellationToken cancellationToken);
 
 	Task StopAsync(CancellationToken cancellationToken);
 }
@@ -199,28 +218,36 @@ public sealed record FieldError(string? Field, string Code, string Message);
 public enum OperationStatus
 {
 	Ok,
+
 	Rejected,
+
 	Error
 }
 
 public enum KeyingMethod
 {
 	Relay,
+
 	Rm
 }
 
 public enum DetectMethod
 {
 	Vox,
+
 	Rm
 }
 
 public enum LogLevel
 {
 	Trace,
+
 	Debug,
+
 	Info,
+
 	Warning,
+
 	Error
 }
 

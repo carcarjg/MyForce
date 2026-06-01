@@ -274,6 +274,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	private string _mqttDetail = "Broker not connected.";
 
+	private bool _isMqttConnectionBannerVisible = true;
+
+	private string _mqttConnectionBannerText = "MQTT broker is offline. System state may be stale.";
+
 	private static readonly JsonSerializerOptions MqttJsonSerializerOptions = new()
 	{
 		PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -499,6 +503,18 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 	{
 		get => _mqttDetail;
 		private set => SetProperty(ref _mqttDetail, value);
+	}
+
+	public bool IsMqttConnectionBannerVisible
+	{
+		get => _isMqttConnectionBannerVisible;
+		private set => SetProperty(ref _isMqttConnectionBannerVisible, value);
+	}
+
+	public string MqttConnectionBannerText
+	{
+		get => _mqttConnectionBannerText;
+		private set => SetProperty(ref _mqttConnectionBannerText, value);
 	}
 
 	public string Clock
@@ -1601,6 +1617,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 			ClientId: $"myforce-ui-{Environment.MachineName}-{Environment.ProcessId}");
 
 		await _mqttConnectionService.ConnectAsync(settings).ConfigureAwait(false);
+		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.SystemPluginsTopic).ConfigureAwait(false);
+		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.SystemDefinitionTopic).ConfigureAwait(false);
+		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.ModuleTopicFilter).ConfigureAwait(false);
+		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.ConsoleTxTopic).ConfigureAwait(false);
 		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.AudioProcessorRegistryTopic).ConfigureAwait(false);
 		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.StateTopic).ConfigureAwait(false);
 		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.AudioFrameworkStateTopic).ConfigureAwait(false);
@@ -1625,6 +1645,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	private void OnMqttMessageReceived(object? sender, MqttApplicationMessage message)
 	{
+		if (HandleSpecMqttMessage(message))
+		{
+			return;
+		}
+
 		if (string.Equals(message.Topic, InternetRadioMqttTopics.AudioProcessorRegistryTopic, StringComparison.OrdinalIgnoreCase))
 		{
 			var registryPayload = message.ConvertPayloadToString();
@@ -1726,6 +1751,128 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		Dispatcher.UIThread.Post(() => ApplyInternetRadioPlaybackState(state));
 	}
 
+	private bool HandleSpecMqttMessage(MqttApplicationMessage message)
+	{
+		if (string.Equals(message.Topic, InternetRadioMqttTopics.ConsoleTxTopic, StringComparison.OrdinalIgnoreCase))
+		{
+			var payload = message.ConvertPayloadToString();
+			if (string.IsNullOrWhiteSpace(payload))
+			{
+				return true;
+			}
+
+			var consoleTx = JsonSerializer.Deserialize<ConsoleTxStateMessage>(payload, MqttJsonSerializerOptions);
+			if (consoleTx is not null)
+			{
+				Dispatcher.UIThread.Post(() => ApplyConsoleTxState(consoleTx));
+			}
+
+			return true;
+		}
+
+		if (!message.Topic.StartsWith("myforce/module/", StringComparison.OrdinalIgnoreCase))
+		{
+			return false;
+		}
+
+		var topicParts = message.Topic.Split('/', StringSplitOptions.RemoveEmptyEntries);
+		if (topicParts.Length != 4)
+		{
+			return false;
+		}
+
+		var payloadText = message.ConvertPayloadToString();
+		if (string.IsNullOrWhiteSpace(payloadText))
+		{
+			return true;
+		}
+
+		var topicClass = topicParts[3];
+		if (string.Equals(topicClass, "registry", StringComparison.OrdinalIgnoreCase))
+		{
+			var registry = JsonSerializer.Deserialize<ModuleRegistrySpecMessage>(payloadText, MqttJsonSerializerOptions);
+			if (registry is not null)
+			{
+				Dispatcher.UIThread.Post(() => ApplyModuleRegistrySpec(registry));
+			}
+
+			return true;
+		}
+
+		if (string.Equals(topicClass, "status", StringComparison.OrdinalIgnoreCase))
+		{
+			var status = JsonSerializer.Deserialize<ModuleStatusSpecMessage>(payloadText, MqttJsonSerializerOptions);
+			if (status is not null)
+			{
+				Dispatcher.UIThread.Post(() => ApplyModuleStatusSpec(message.Topic, status));
+			}
+
+			return true;
+		}
+
+		if (string.Equals(topicClass, "state", StringComparison.OrdinalIgnoreCase))
+		{
+			var state = JsonSerializer.Deserialize<ModuleRadioStateSpecMessage>(payloadText, MqttJsonSerializerOptions);
+			if (state is not null)
+			{
+				Dispatcher.UIThread.Post(() => ApplyModuleRadioStateSpec(state));
+			}
+
+			return true;
+		}
+
+		return true;
+	}
+
+	private void ApplyConsoleTxState(ConsoleTxStateMessage state)
+	{
+		ArgumentNullException.ThrowIfNull(state);
+		CurSelChExt4 = string.Equals(state.State, "active", StringComparison.OrdinalIgnoreCase)
+			? $"TX HELD BY {state.Holder ?? "UNKNOWN"}: {state.Target ?? "UNKNOWN"}"
+			: "TX IDLE";
+	}
+
+	private void ApplyModuleRegistrySpec(ModuleRegistrySpecMessage registry)
+	{
+		ArgumentNullException.ThrowIfNull(registry);
+		var existing = AvailableRadioTypes.Where(entry => !string.Equals(entry.RadioId, registry.Id, StringComparison.OrdinalIgnoreCase));
+		AvailableRadioTypes = existing.Append(new RadioRegistryEntryMessage(
+			registry.Id,
+			registry.TypeId,
+			registry.Id,
+			registry.Kind,
+			registry.Capabilities,
+			registry.ConfigSchema.GetRawText(),
+			registry.ConfigSchema.GetRawText())).ToArray();
+		RaiseAdminNetworkStateChanged();
+	}
+
+	private void ApplyModuleStatusSpec(string topic, ModuleStatusSpecMessage status)
+	{
+		ArgumentNullException.ThrowIfNull(status);
+		var componentStatus = status.Online && string.Equals(status.Health, "available", StringComparison.OrdinalIgnoreCase)
+			? AdminComponentStatus.Online
+			: AdminComponentStatus.Offline;
+		var detail = status.Online
+			? $"Health: {status.Health}"
+			: $"Offline: {status.Reason ?? "offline"}";
+		UpdateSystemComponentStatus(status.Id, componentStatus, detail, topic);
+	}
+
+	private void ApplyModuleRadioStateSpec(ModuleRadioStateSpecMessage state)
+	{
+		ArgumentNullException.ThrowIfNull(state);
+		if (state.Channel?.Label is not null)
+		{
+			CurrentRadioChannel = state.Channel.Label;
+		}
+
+		CurrentTalkRadio = state.Id;
+		CurSelChExt1 = state.RxActive ? "RX ACTIVE" : "RX IDLE";
+		CurSelChExt2 = state.TxActive ? $"TX ACTIVE / {state.TxSource ?? "manual"}" : "TX IDLE";
+		CurSelChExt3 = state.Signal?.RssiDbm is null ? string.Empty : $"RSSI {state.Signal.RssiDbm} dBm";
+	}
+
 	/// <summary>
 	/// Applies the retained AP radio runtime metadata for future schema-driven admin rendering.
 	/// </summary>
@@ -1751,6 +1898,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		MqttStatus = state.Status;
 		MqttEndpoint = string.IsNullOrWhiteSpace(state.Endpoint) ? "127.0.0.1:1883" : state.Endpoint;
 		MqttDetail = state.Detail;
+		IsMqttConnectionBannerVisible = !state.IsConnected;
+		MqttConnectionBannerText = state.IsConnected
+			? "MQTT broker connected."
+			: $"MQTT broker offline: {state.Detail}";
 
 		if (state.IsConnected)
 		{
