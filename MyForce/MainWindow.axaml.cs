@@ -17,10 +17,26 @@
 //
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
+using Mapsui;
+using Mapsui.Extensions;
+using Mapsui.Layers;
+using Mapsui.Nts;
+using Mapsui.Projections;
+using Mapsui.Providers;
+using Mapsui.Styles;
+using Mapsui.Tiling;
+using Mapsui.UI.Avalonia;
+using Mapsui.Utilities;
+using NetTopologySuite.Geometries;
+using MyForce.Models;
+using MyForce.Services;
 using MyForce.ViewModels;
 
 namespace MyForce;
@@ -32,20 +48,211 @@ public partial class MainWindow : Window
 	private static readonly TimeSpan AdminTapWindow = TimeSpan.FromSeconds(20);
 
 	private readonly MainWindowViewModel _viewModel;
+	private readonly MemoryLayer _vehicleLayer = new() { Name = "Vehicle" };
+	private readonly MemoryLayer _alertLayer = new() { Name = "Alerts" };
+	private readonly WeatherAlertService _weatherAlertService = new();
 
 	private readonly Queue<DateTime> _speedTapTimes = new();
+	private MapControl? _radarMapControl;
+	private CancellationTokenSource? _alertRefreshCts;
 
 	public MainWindow()
 	{
 		InitializeComponent();
 		_viewModel = new MainWindowViewModel();
 		DataContext = _viewModel;
+		InitializeRadarMap();
 	}
 
 	protected override void OnClosed(System.EventArgs e)
 	{
+		_alertRefreshCts?.Cancel();
+		_alertRefreshCts?.Dispose();
+
+		if (_viewModel is not null)
+		{
+			_viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+		}
+
 		_viewModel.Dispose();
 		base.OnClosed(e);
+	}
+
+	private void InitializeRadarMap()
+	{
+		ContentControl? radarMapHost = this.FindControl<ContentControl>("RadarMapHost");
+		if (radarMapHost is null)
+		{
+			return;
+		}
+
+		Map map = new();
+		map.Layers.Add(OpenStreetMap.CreateTileLayer());
+		map.Layers.Add(_alertLayer);
+		map.Layers.Add(_vehicleLayer);
+
+		_radarMapControl = new MapControl
+		{
+			Map = map,
+			UseContinuousMouseWheelZoom = true,
+			ContinuousMouseWheelZoomStepSize = 0.5,
+			UseFling = false,
+		};
+
+		radarMapHost.Content = _radarMapControl;
+		_viewModel.PropertyChanged += OnViewModelPropertyChanged;
+		UpdateRadarMapLocation();
+		_ = UpdateRadarMapAlertsAsync();
+	}
+
+	private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+	{
+		if (string.Equals(e.PropertyName, nameof(MainWindowViewModel.LocationLatitude), StringComparison.Ordinal)
+			|| string.Equals(e.PropertyName, nameof(MainWindowViewModel.LocationLongitude), StringComparison.Ordinal)
+			|| string.Equals(e.PropertyName, nameof(MainWindowViewModel.VehicleHeadingDegrees), StringComparison.Ordinal))
+		{
+			UpdateRadarMapLocation();
+			_ = UpdateRadarMapAlertsAsync();
+			return;
+		}
+
+		if (string.Equals(e.PropertyName, nameof(MainWindowViewModel.IsRadarFollowEnabled), StringComparison.Ordinal))
+		{
+			UpdateRadarMapLocation();
+		}
+	}
+
+	private void UpdateRadarMapLocation()
+	{
+		if (_radarMapControl?.Map is null)
+		{
+			return;
+		}
+
+		double longitude = _viewModel.LocationLongitude;
+		double latitude = _viewModel.LocationLatitude;
+		(double x, double y) = SphericalMercator.FromLonLat(longitude, latitude);
+		MPoint sphericalMercator = new(x, y);
+
+		PointFeature vehicleFeature = new(sphericalMercator)
+		{
+			Styles =
+			[
+				new SymbolStyle
+				{
+					SymbolType = SymbolType.Triangle,
+					Fill = new Brush(Color.FromArgb(255, 77, 225, 255)),
+					Outline = new Pen { Color = Color.White, Width = 2 },
+					SymbolScale = 0.9,
+					SymbolRotation = _viewModel.VehicleHeadingDegrees,
+				},
+			],
+		};
+
+		_vehicleLayer.Features = [vehicleFeature];
+		if (_viewModel.IsRadarFollowEnabled)
+		{
+			_radarMapControl.Map.Navigator.CenterOnAndZoomTo(sphericalMercator, _radarMapControl.Map.Navigator.Resolutions[9]);
+		}
+
+		_radarMapControl.Refresh();
+	}
+
+	private async Task UpdateRadarMapAlertsAsync()
+	{
+		if (_radarMapControl?.Map is null)
+		{
+			return;
+		}
+
+		_alertRefreshCts?.Cancel();
+		_alertRefreshCts?.Dispose();
+		_alertRefreshCts = new CancellationTokenSource();
+		CancellationToken cancellationToken = _alertRefreshCts.Token;
+
+		try
+		{
+			IReadOnlyList<WeatherAlertPolygon> polygons = await _weatherAlertService
+				.GetActiveAlertsAsync(new GeoCoordinate(_viewModel.LocationLatitude, _viewModel.LocationLongitude), cancellationToken)
+				.ConfigureAwait(false);
+
+			IReadOnlyList<IFeature> features = polygons
+				.Select(CreateAlertFeature)
+				.Where(feature => feature is not null)
+				.Cast<IFeature>()
+				.ToArray();
+
+			await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+			{
+				_alertLayer.Features = features;
+				_radarMapControl?.Refresh();
+			});
+		}
+		catch (OperationCanceledException)
+		{
+		}
+		catch (Exception)
+		{
+			await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+			{
+				_alertLayer.Features = [];
+				_radarMapControl?.Refresh();
+			});
+		}
+	}
+
+	private static IFeature? CreateAlertFeature(WeatherAlertPolygon polygon)
+	{
+		if (polygon.Coordinates.Count < 3)
+		{
+			return null;
+		}
+
+		Coordinate[] projectedCoordinates = polygon.Coordinates
+			.Select(coordinate =>
+			{
+				(double x, double y) = SphericalMercator.FromLonLat(coordinate.Longitude, coordinate.Latitude);
+				return new Coordinate(x, y);
+			})
+			.ToArray();
+
+		if (!projectedCoordinates[0].Equals2D(projectedCoordinates[^1]))
+		{
+			Array.Resize(ref projectedCoordinates, projectedCoordinates.Length + 1);
+			projectedCoordinates[^1] = projectedCoordinates[0];
+		}
+
+		GeometryFeature feature = new()
+		{
+			Geometry = new Polygon(new LinearRing(projectedCoordinates)),
+			Styles =
+			[
+				new VectorStyle
+				{
+					Fill = new Brush(Color.FromArgb(46, GetAlertColor(polygon.Severity).R, GetAlertColor(polygon.Severity).G, GetAlertColor(polygon.Severity).B)),
+					Outline = new Pen { Color = GetAlertColor(polygon.Severity), Width = 2 },
+				},
+			],
+		};
+
+		feature["event"] = polygon.EventName;
+		return feature;
+	}
+
+	private static Color GetAlertColor(string severity)
+	{
+		return severity.ToUpperInvariant() switch
+		{
+			"EXTREME" => Color.FromArgb(255, 255, 59, 48),
+			"SEVERE" => Color.FromArgb(255, 255, 149, 0),
+			"MODERATE" => Color.FromArgb(255, 255, 214, 10),
+			_ => Color.FromArgb(255, 77, 225, 255),
+		};
+	}
+
+	private void OnRadarFollowPressed(object? sender, PointerPressedEventArgs e)
+	{
+		_viewModel.ToggleRadarFollow();
 	}
 
 	private void OnChannelUpPressed(object? sender, PointerPressedEventArgs e)

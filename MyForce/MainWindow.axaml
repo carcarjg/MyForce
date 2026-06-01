@@ -2,7 +2,6 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:controls="using:MyForce.Controls"
         xmlns:viewModels="using:MyForce.ViewModels"
         xmlns:models="using:MyForce.Models"
         xmlns:system="clr-namespace:System;assembly=System.Runtime"
@@ -897,7 +896,7 @@
                                   Height="605"
                                   RowDefinitions="42,553"
                                   RowSpacing="10">
-                                <Grid ColumnDefinitions="Auto,*"
+                                <Grid ColumnDefinitions="Auto,*,150"
                                       ColumnSpacing="12"
                                       VerticalAlignment="Center">
                                     <TextBlock Classes="white"
@@ -910,20 +909,29 @@
                                                VerticalAlignment="Center"
                                                HorizontalAlignment="Right"
                                                Text="MAP + ACTIVE ALERTS" />
+                                    <Border Grid.Column="2"
+                                            Classes="buttonFrame"
+                                            Width="150"
+                                            Height="34"
+                                            PointerPressed="OnRadarFollowPressed">
+                                        <Viewbox Stretch="Uniform">
+                                            <TextBlock Classes="white"
+                                                       TextAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Text="{Binding RadarFollowButtonText}" />
+                                        </Viewbox>
+                                    </Border>
                                 </Grid>
                                 <Border Grid.Row="1"
                                         Classes="panel"
                                         Width="884"
                                         Height="553"
                                         Padding="2">
-                                    <controls:RadarMapControl Width="880"
-                                                              Height="549"
-                                                              HorizontalAlignment="Center"
-                                                              VerticalAlignment="Center"
-                                                              Latitude="{Binding LocationLatitude}"
-                                                              Longitude="{Binding LocationLongitude}"
-                                                              HeadingDegrees="{Binding VehicleHeadingDegrees}"
-                                                              ZoomLevel="9" />
+                                    <ContentControl x:Name="RadarMapHost"
+                                                    Width="880"
+                                                    Height="549"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center" />
                                 </Border>
                             </Grid>
                         </Border>

@@ -145,6 +145,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	private double _vehicleHeadingDegrees = 22d;
 
+	private bool _isRadarFollowEnabled = true;
+
 	private string _clock = string.Empty;
 
 	private string _date = string.Empty;
@@ -335,6 +337,24 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 	{
 		get => _vehicleHeadingDegrees;
 		set => SetProperty(ref _vehicleHeadingDegrees, value);
+	}
+
+	public bool IsRadarFollowEnabled
+	{
+		get => _isRadarFollowEnabled;
+		set => SetProperty(ref _isRadarFollowEnabled, value);
+	}
+
+	public string RadarFollowButtonText => IsRadarFollowEnabled ? "FOLLOW ON" : "FOLLOW OFF";
+
+	public void ToggleRadarFollow()
+	{
+		if (!SetProperty(ref _isRadarFollowEnabled, !_isRadarFollowEnabled, nameof(IsRadarFollowEnabled)))
+		{
+			return;
+		}
+
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RadarFollowButtonText)));
 	}
 
 	public string CurrentTalkRadio
