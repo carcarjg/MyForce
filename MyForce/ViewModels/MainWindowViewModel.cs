@@ -143,6 +143,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	private double _locationLongitude = -97.6384d;
 
+	private double _vehicleHeadingDegrees = 22d;
+
 	private string _clock = string.Empty;
 
 	private string _date = string.Empty;
@@ -328,6 +330,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 	public string LocationValue => string.Create(
 		CultureInfo.InvariantCulture,
 		$"{LocationLatitude:0.0000}, {LocationLongitude:0.0000}");
+
+	public double VehicleHeadingDegrees
+	{
+		get => _vehicleHeadingDegrees;
+		set => SetProperty(ref _vehicleHeadingDegrees, value);
+	}
 
 	public string CurrentTalkRadio
 	{

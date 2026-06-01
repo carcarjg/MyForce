@@ -922,6 +922,7 @@
                                                               VerticalAlignment="Center"
                                                               Latitude="{Binding LocationLatitude}"
                                                               Longitude="{Binding LocationLongitude}"
+                                                              HeadingDegrees="{Binding VehicleHeadingDegrees}"
                                                               ZoomLevel="9" />
                                 </Border>
                             </Grid>

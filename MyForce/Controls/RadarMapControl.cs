@@ -6,8 +6,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using MyForce.Models;
 using MyForce.Services;
 
@@ -18,28 +20,43 @@ public sealed class RadarMapControl : Control, IDisposable
 	public static readonly StyledProperty<double> LatitudeProperty = AvaloniaProperty.Register<RadarMapControl, double>(nameof(Latitude));
 	public static readonly StyledProperty<double> LongitudeProperty = AvaloniaProperty.Register<RadarMapControl, double>(nameof(Longitude));
 	public static readonly StyledProperty<int> ZoomLevelProperty = AvaloniaProperty.Register<RadarMapControl, int>(nameof(ZoomLevel), 8);
+	public static readonly StyledProperty<double> HeadingDegreesProperty = AvaloniaProperty.Register<RadarMapControl, double>(nameof(HeadingDegrees));
 
 	private readonly MapTileService _mapTileService = new();
 	private readonly WeatherAlertService _weatherAlertService = new();
 	private readonly Dictionary<(int Zoom, int X, int Y), Bitmap?> _visibleTiles = [];
+	private readonly DispatcherTimer _refreshTimer;
 	private IReadOnlyList<WeatherAlertPolygon> _alertPolygons = Array.Empty<WeatherAlertPolygon>();
 	private CancellationTokenSource? _refreshCts;
 	private bool _disposed;
 	private bool _isAttachedToVisualTree;
+	private bool _isPointerCaptured;
+	private bool _isMapLoading = true;
+	private string? _statusMessage = "Loading map tiles...";
 	private double _lastAlertLatitude = double.NaN;
 	private double _lastAlertLongitude = double.NaN;
+	private double _viewportLatitude = double.NaN;
+	private double _viewportLongitude = double.NaN;
+	private Point _lastPointerPosition;
 
 	static RadarMapControl()
 	{
-		AffectsRender<RadarMapControl>(LatitudeProperty, LongitudeProperty, ZoomLevelProperty);
+		AffectsRender<RadarMapControl>(LatitudeProperty, LongitudeProperty, ZoomLevelProperty, HeadingDegreesProperty);
 		LatitudeProperty.Changed.AddClassHandler<RadarMapControl>((control, _) => control.OnViewportChanged());
 		LongitudeProperty.Changed.AddClassHandler<RadarMapControl>((control, _) => control.OnViewportChanged());
 		ZoomLevelProperty.Changed.AddClassHandler<RadarMapControl>((control, _) => control.OnViewportChanged());
+		HeadingDegreesProperty.Changed.AddClassHandler<RadarMapControl>((control, _) => control.InvalidateVisual());
 	}
 
 	public RadarMapControl()
 	{
 		ClipToBounds = true;
+		_refreshTimer = new DispatcherTimer
+		{
+			Interval = TimeSpan.FromSeconds(60),
+		};
+
+		_refreshTimer.Tick += OnRefreshTimerTick;
 	}
 
 	public double Latitude
@@ -60,6 +77,12 @@ public sealed class RadarMapControl : Control, IDisposable
 		set => SetValue(ZoomLevelProperty, value);
 	}
 
+	public double HeadingDegrees
+	{
+		get => GetValue(HeadingDegreesProperty);
+		set => SetValue(HeadingDegreesProperty, value);
+	}
+
 	public override void Render(DrawingContext context)
 	{
 		base.Render(context);
@@ -71,7 +94,8 @@ public sealed class RadarMapControl : Control, IDisposable
 			return;
 		}
 
-		GeoPixelCoordinate centerPixel = Project(Latitude, Longitude, ZoomLevel);
+		EnsureViewportCenterInitialized();
+		GeoPixelCoordinate centerPixel = Project(_viewportLatitude, _viewportLongitude, ZoomLevel);
 		double left = centerPixel.X - bounds.Width / 2d;
 		double top = centerPixel.Y - bounds.Height / 2d;
 		int tileSize = 256;
@@ -110,7 +134,8 @@ public sealed class RadarMapControl : Control, IDisposable
 		}
 
 		DrawAlertPolygons(context, bounds, left, top);
-		DrawLocationMarker(context, bounds);
+		DrawLocationMarker(context, left, top);
+		DrawStatusOverlay(context, bounds);
 	}
 
 	public void Dispose()
@@ -123,6 +148,8 @@ public sealed class RadarMapControl : Control, IDisposable
 		_disposed = true;
 		_refreshCts?.Cancel();
 		_refreshCts?.Dispose();
+		_refreshTimer.Stop();
+		_refreshTimer.Tick -= OnRefreshTimerTick;
 		_mapTileService.Dispose();
 	}
 
@@ -130,13 +157,73 @@ public sealed class RadarMapControl : Control, IDisposable
 	{
 		base.OnAttachedToVisualTree(e);
 		_isAttachedToVisualTree = true;
+		EnsureViewportCenterInitialized();
+		_refreshTimer.Start();
 		OnViewportChanged();
 	}
 
 	protected override void OnDetachedFromVisualTree(Avalonia.VisualTreeAttachmentEventArgs e)
 	{
 		_isAttachedToVisualTree = false;
+		_refreshTimer.Stop();
 		base.OnDetachedFromVisualTree(e);
+	}
+
+	protected override void OnPointerPressed(PointerPressedEventArgs e)
+	{
+		base.OnPointerPressed(e);
+		if (_disposed)
+		{
+			return;
+		}
+
+		_lastPointerPosition = e.GetPosition(this);
+		_isPointerCaptured = true;
+		e.Pointer.Capture(this);
+	}
+
+	protected override void OnPointerMoved(PointerEventArgs e)
+	{
+		base.OnPointerMoved(e);
+		if (!_isPointerCaptured)
+		{
+			return;
+		}
+
+		Point currentPosition = e.GetPosition(this);
+		Vector delta = currentPosition - _lastPointerPosition;
+		_lastPointerPosition = currentPosition;
+		PanViewport(delta);
+	}
+
+	protected override void OnPointerReleased(PointerReleasedEventArgs e)
+	{
+		base.OnPointerReleased(e);
+		ReleasePointerCapture(e.Pointer);
+	}
+
+	protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+	{
+		base.OnPointerCaptureLost(e);
+		_isPointerCaptured = false;
+	}
+
+	protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
+	{
+		base.OnPointerWheelChanged(e);
+		if (_disposed)
+		{
+			return;
+		}
+
+		int newZoomLevel = Math.Clamp(ZoomLevel + (e.Delta.Y > 0 ? 1 : -1), 3, 16);
+		if (newZoomLevel == ZoomLevel)
+		{
+			return;
+		}
+
+		ZoomLevel = newZoomLevel;
+		e.Handled = true;
 	}
 
 	protected override Size ArrangeOverride(Size finalSize)
@@ -152,6 +239,12 @@ public sealed class RadarMapControl : Control, IDisposable
 			return;
 		}
 
+		if (double.IsNaN(_viewportLatitude) || double.IsNaN(_viewportLongitude))
+		{
+			_viewportLatitude = Latitude;
+			_viewportLongitude = Longitude;
+		}
+
 		_ = RefreshAsync();
 	}
 
@@ -164,8 +257,15 @@ public sealed class RadarMapControl : Control, IDisposable
 
 		try
 		{
+			_isMapLoading = true;
+			_statusMessage = "Loading map tiles...";
+			await Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
 			await LoadVisibleTilesAsync(cancellationToken).ConfigureAwait(false);
 			await LoadAlertsAsync(cancellationToken).ConfigureAwait(false);
+			_isMapLoading = false;
+			_statusMessage = _visibleTiles.Values.Any(bitmap => bitmap is not null)
+				? null
+				: "Map tiles unavailable";
 			await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
 		}
 		catch (OperationCanceledException)
@@ -173,6 +273,8 @@ public sealed class RadarMapControl : Control, IDisposable
 		}
 		catch (Exception)
 		{
+			_isMapLoading = false;
+			_statusMessage = "Unable to refresh map data";
 			await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
 		}
 	}
@@ -180,7 +282,7 @@ public sealed class RadarMapControl : Control, IDisposable
 	private async Task LoadVisibleTilesAsync(CancellationToken cancellationToken)
 	{
 		Rect bounds = new(Bounds.Size);
-		GeoPixelCoordinate centerPixel = Project(Latitude, Longitude, ZoomLevel);
+		GeoPixelCoordinate centerPixel = Project(_viewportLatitude, _viewportLongitude, ZoomLevel);
 		double left = centerPixel.X - bounds.Width / 2d;
 		double top = centerPixel.Y - bounds.Height / 2d;
 		int tileSize = 256;
@@ -213,6 +315,7 @@ public sealed class RadarMapControl : Control, IDisposable
 			}
 
 			_visibleTiles[(zoom, x, y)] = await _mapTileService.GetTileAsync(zoom, x, y, cancellationToken).ConfigureAwait(false);
+			await Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
 		}
 
 		foreach ((int Zoom, int X, int Y) key in _visibleTiles.Keys.Where(key => !requiredKeys.Contains(key)).ToArray())
@@ -233,13 +336,46 @@ public sealed class RadarMapControl : Control, IDisposable
 		_lastAlertLongitude = Longitude;
 	}
 
-	private void DrawLocationMarker(DrawingContext context, Rect bounds)
+	private void DrawLocationMarker(DrawingContext context, double left, double top)
 	{
-		Point center = new(bounds.Width / 2d, bounds.Height / 2d);
-		IBrush markerBrush = new SolidColorBrush(Color.Parse("#4DE1FF"));
-		IPen markerPen = new Pen(new SolidColorBrush(Color.Parse("#FFFFFF")), 2);
-		context.DrawEllipse(markerBrush, markerPen, center, 8, 8);
-		context.DrawLine(markerPen, new Point(center.X, center.Y - 14), new Point(center.X, center.Y - 28));
+		GeoPixelCoordinate vehiclePixel = Project(Latitude, Longitude, ZoomLevel);
+		Point center = new(vehiclePixel.X - left, vehiclePixel.Y - top);
+		StreamGeometry geometry = new();
+		using (StreamGeometryContext geometryContext = geometry.Open())
+		{
+			geometryContext.BeginFigure(new Point(0, -18), true);
+			geometryContext.LineTo(new Point(10, 12));
+			geometryContext.LineTo(new Point(0, 6));
+			geometryContext.LineTo(new Point(-10, 12));
+			geometryContext.EndFigure(true);
+		}
+
+		using (context.PushTransform(Matrix.CreateTranslation(center.X, center.Y) * Matrix.CreateRotation(HeadingDegrees * Math.PI / 180d)))
+		{
+			context.DrawGeometry(new SolidColorBrush(Color.Parse("#4DE1FF")), new Pen(new SolidColorBrush(Color.Parse("#FFFFFF")), 2), geometry);
+		}
+	}
+
+	private void DrawStatusOverlay(DrawingContext context, Rect bounds)
+	{
+		if (string.IsNullOrWhiteSpace(_statusMessage) && !_isMapLoading)
+		{
+			return;
+		}
+
+		string text = _isMapLoading ? "Loading map tiles and alerts..." : _statusMessage ?? string.Empty;
+		Rect overlayBounds = new(16, bounds.Height - 44, Math.Max(220, Math.Min(bounds.Width - 32, 360)), 28);
+		context.FillRectangle(new SolidColorBrush(Color.Parse("#88000000")), overlayBounds, 6);
+
+		FormattedText formattedText = new(
+			text,
+			CultureInfo.InvariantCulture,
+			FlowDirection.LeftToRight,
+			new Typeface("Segoe UI"),
+			14,
+			new SolidColorBrush(Color.Parse("#F8F8F8")));
+
+		context.DrawText(formattedText, new Point(overlayBounds.X + 10, overlayBounds.Y + 6));
 	}
 
 	private void DrawAlertPolygons(DrawingContext context, Rect bounds, double left, double top)
@@ -292,10 +428,65 @@ public sealed class RadarMapControl : Control, IDisposable
 		return new GeoPixelCoordinate(x, y);
 	}
 
+	private static GeoCoordinate Unproject(double x, double y, int zoomLevel)
+	{
+		double mapSize = 256d * (1 << zoomLevel);
+		double longitude = x / mapSize * 360d - 180d;
+		double mercator = Math.PI - 2d * Math.PI * y / mapSize;
+		double latitude = 180d / Math.PI * Math.Atan(Math.Sinh(mercator));
+		return new GeoCoordinate(latitude, longitude);
+	}
+
 	private static int Mod(int value, int modulus)
 	{
 		int result = value % modulus;
 		return result < 0 ? result + modulus : result;
+	}
+
+	private void EnsureViewportCenterInitialized()
+	{
+		if (!double.IsNaN(_viewportLatitude) && !double.IsNaN(_viewportLongitude))
+		{
+			return;
+		}
+
+		_viewportLatitude = Latitude;
+		_viewportLongitude = Longitude;
+	}
+
+	private void PanViewport(Vector delta)
+	{
+		EnsureViewportCenterInitialized();
+		GeoPixelCoordinate centerPixel = Project(_viewportLatitude, _viewportLongitude, ZoomLevel);
+		GeoCoordinate newCenter = Unproject(centerPixel.X - delta.X, centerPixel.Y - delta.Y, ZoomLevel);
+		_viewportLatitude = newCenter.Latitude;
+		_viewportLongitude = newCenter.Longitude;
+		OnViewportChanged();
+	}
+
+	private void OnRefreshTimerTick(object? sender, EventArgs e)
+	{
+		if (_disposed)
+		{
+			return;
+		}
+
+		_visibleTiles.Clear();
+		_lastAlertLatitude = double.NaN;
+		_lastAlertLongitude = double.NaN;
+		_statusMessage = "Refreshing map data...";
+		OnViewportChanged();
+	}
+
+	private void ReleasePointerCapture(IPointer pointer)
+	{
+		if (!_isPointerCaptured)
+		{
+			return;
+		}
+
+		_isPointerCaptured = false;
+		pointer.Capture(null);
 	}
 
 	private readonly record struct GeoPixelCoordinate(double X, double Y);
