@@ -34,7 +34,9 @@ namespace MyForce.ViewModels;
 public enum AdminComponentStatus
 {
 	Unknown,
+
 	Online,
+
 	Offline,
 }
 
@@ -59,23 +61,36 @@ public sealed record AdminSystemComponentStatus(
 public enum MainConsoleTab
 {
 	Patrol,
+
 	LightsAndSirens,
+
 	Radio,
+
 	Radar,
+
 	AmFm,
+
 	Cad,
+
 	Camera,
 }
 
 public enum AdminSection
 {
 	System,
+
 	SystemStatus,
+
 	Audio,
+
 	Radio,
+
 	Network,
+
 	Security,
+
 	Integrations,
+
 	Diagnostics,
 }
 
@@ -112,21 +127,32 @@ public enum AlertCodeMode
 public enum AuxiliaryAudioSourceMode
 {
 	Fm1,
+
 	Am1,
+
 	Bluetooth,
+
 	InternetRadio,
 }
 
 public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 {
 	private const int PresetCount = 6;
+
 	private const string AdminPinCode = "2135";
+
 	private const string AudioProcessorStatusTopic = "myforce/ap/status/service";
+
 	private const string AudioProcessorChannelGainCommandTopic = "myforce/ap/cmd/channel-gain";
+
 	private const string AudioProcessorEntertainmentChannelId = "entertainment";
+
 	private const string DefaultAudioOutputSpeakerId = "cabin-speaker";
+
 	private const string GpioControllerStatusTopic = "myforce/gpio/status/service";
+
 	private const string SirenInterfaceStatusTopic = "myforce/siren/status/service";
+
 	private static readonly TimeSpan ComponentHeartbeatTimeout = TimeSpan.FromSeconds(15);
 
 	private const int InternetStationViewportSize = 6;
@@ -184,9 +210,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 	private InternetRadioStation? _selectedInternetStation;
 
 	private string _bluetoothDisplayLabel = "BT AUDIO";
+
 	private bool _isAmFmChannelSetArmed;
+
 	private decimal?[] _fmPresetStations = new decimal?[PresetCount];
+
 	private decimal?[] _amPresetStations = new decimal?[PresetCount];
+
 	private string?[] _internetPresetStationNames = new string?[PresetCount];
 
 	private IReadOnlyList<InternetRadioStation> _internetRadioStations = Array.Empty<InternetRadioStation>();
@@ -228,6 +258,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 	private MainConsoleTab _selectedTab = MainConsoleTab.Patrol;
 
 	private bool _isAdminOverlayVisible;
+
 	private bool _isAdminAuthenticated;
 
 	private AdminSection _selectedAdminSection = AdminSection.System;
@@ -935,34 +966,42 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 				AdminSectionTitle = "SYSTEM / GENERAL";
 				AdminSectionDescription = "General system settings and overview content live here.";
 				break;
+
 			case AdminSection.SystemStatus:
 				AdminSectionTitle = "SYSTEM / STATUS";
 				AdminSectionDescription = "Live component availability is shown here using retained MQTT state plus heartbeat freshness checks.";
 				break;
+
 			case AdminSection.Audio:
 				AdminSectionTitle = "AUDIO";
 				AdminSectionDescription = "Audio routing, gain staging, and operator device settings will live here.";
 				break;
+
 			case AdminSection.Radio:
 				AdminSectionTitle = "RADIO";
 				AdminSectionDescription = "Radio resources, channels, and talk group configuration will live here.";
 				break;
+
 			case AdminSection.Network:
 				AdminSectionTitle = "NETWORK";
 				AdminSectionDescription = "MQTT, LAN, broker, and remote endpoint configuration will live here.";
 				break;
+
 			case AdminSection.Security:
 				AdminSectionTitle = "SECURITY";
 				AdminSectionDescription = "Authentication, roles, and system access configuration will live here.";
 				break;
+
 			case AdminSection.Integrations:
 				AdminSectionTitle = "INTEGRATIONS";
 				AdminSectionDescription = "CAD, siren, SCADA, and other external integration settings will live here.";
 				break;
+
 			case AdminSection.Diagnostics:
 				AdminSectionTitle = "DIAGNOSTICS";
 				AdminSectionDescription = "Health, logging, and diagnostics configuration will live here.";
 				break;
+
 			default:
 				throw new ArgumentOutOfRangeException(nameof(section), section, null);
 		}
@@ -1676,7 +1715,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 	/// </summary>
 	private async Task PublishInternetRadioStopCommandAsync()
 	{
-		await _mqttConnectionService.PublishAsync(InternetRadioMqttTopics.StopCommandTopic, "{}" ).ConfigureAwait(false);
+		await _mqttConnectionService.PublishAsync(InternetRadioMqttTopics.StopCommandTopic, "{}").ConfigureAwait(false);
 	}
 
 	/// <summary>
@@ -2015,14 +2054,18 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 			case AuxiliaryAudioSourceMode.Fm1:
 				_fmPresetStations[presetIndex] = _amFmFrequency;
 				break;
+
 			case AuxiliaryAudioSourceMode.Am1:
 				_amPresetStations[presetIndex] = _amFrequency;
 				break;
+
 			case AuxiliaryAudioSourceMode.Bluetooth:
 				break;
+
 			case AuxiliaryAudioSourceMode.InternetRadio:
 				_internetPresetStationNames[presetIndex] = _selectedInternetStation?.DisplayName;
 				break;
+
 			default:
 				throw new ArgumentOutOfRangeException();
 		}
@@ -2040,6 +2083,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 				_amFmFrequency = _fmPresetStations[presetIndex]!.Value;
 				return true;
+
 			case AuxiliaryAudioSourceMode.Am1:
 				if (!_amPresetStations[presetIndex].HasValue)
 				{
@@ -2048,10 +2092,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 				_amFrequency = _amPresetStations[presetIndex]!.Value;
 				return true;
+
 			case AuxiliaryAudioSourceMode.Bluetooth:
 				return false;
+
 			case AuxiliaryAudioSourceMode.InternetRadio:
 				return RecallInternetPreset(presetIndex);
+
 			default:
 				throw new ArgumentOutOfRangeException();
 		}

@@ -54,7 +54,7 @@ internal sealed class GpioControllerMqttApp : IAsyncDisposable
 			serviceName: "gpio-controller",
 			lastWillMessage: new MqttLastWillMessage(topics.ServiceStatusTopic, lastWillPayload, true));
 		_coordinator = new GpioControllerCoordinator(_mqttRuntime, topics);
-        _mqttRuntime.SetConnectedHandler(_coordinator.HandleConnectedAsync);
+		_mqttRuntime.SetConnectedHandler(_coordinator.HandleConnectedAsync);
 		_mqttRuntime.SetMessageHandler(_coordinator.HandleMessageAsync);
 	}
 
@@ -92,7 +92,9 @@ internal sealed class GpioControllerMqttApp : IAsyncDisposable
 internal sealed class MqttServiceRuntime : IAsyncDisposable
 {
 	private readonly IMqttClient _client;
+
 	private readonly Lock _syncRoot = new();
+
 	private readonly CancellationTokenSource _lifetimeCancellationTokenSource = new();
 
 	private readonly MqttLastWillMessage? _lastWillMessage;
@@ -101,11 +103,16 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
 
 	private readonly string _serviceName;
 
-  private MqttClientOptions? _clientOptions;
+	private MqttClientOptions? _clientOptions;
+
 	private Task? _reconnectTask;
+
 	private bool _isDisposed;
+
 	private bool _isReconnectLoopRunning;
+
 	private Func<CancellationToken, Task>? _connectedHandler;
+
 	private Func<MqttApplicationMessageReceivedEventArgs, Task>? _messageHandler;
 
 	public MqttServiceRuntime(string serviceName, MqttLastWillMessage? lastWillMessage = null)
@@ -121,7 +128,7 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
 
 	public async Task ConnectAsync(CancellationToken cancellationToken)
 	{
-     ObjectDisposedException.ThrowIf(_isDisposed, this);
+		ObjectDisposedException.ThrowIf(_isDisposed, this);
 
 		Console.WriteLine($"[{_serviceName}] MQTT configured for {GetEndpointLabel()} using {GetTransportLabel()}.");
 
@@ -149,7 +156,7 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
 			optionsBuilder = optionsBuilder.WithTlsOptions(static builder => builder.UseTls());
 		}
 
-      _clientOptions = optionsBuilder.Build();
+		_clientOptions = optionsBuilder.Build();
 		await TryConnectAsync(cancellationToken).ConfigureAwait(false);
 		StartReconnectLoop();
 	}
@@ -179,7 +186,7 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
 			.WithTopicFilter(topicFilter)
 			.Build();
 
-      try
+		try
 		{
 			await _client.SubscribeAsync(subscribeOptions, cancellationToken).ConfigureAwait(false);
 			Console.WriteLine($"[{_serviceName}] Subscribed: {topicFilter}");
@@ -209,7 +216,7 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
 			.WithRetainFlag(retain)
 			.Build();
 
-     try
+		try
 		{
 			await _client.PublishAsync(message, cancellationToken).ConfigureAwait(false);
 			Console.WriteLine($"[{_serviceName}] Published: {topic}");
@@ -241,7 +248,7 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
 
 	public async ValueTask DisposeAsync()
 	{
-     Task? reconnectTask;
+		Task? reconnectTask;
 
 		lock (_syncRoot)
 		{
@@ -272,14 +279,14 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
 
 		if (_client.IsConnected)
 		{
-            await _client.DisconnectAsync().ConfigureAwait(false);
+			await _client.DisconnectAsync().ConfigureAwait(false);
 		}
 
 		_client.Dispose();
-       _lifetimeCancellationTokenSource.Dispose();
+		_lifetimeCancellationTokenSource.Dispose();
 	}
 
- private async Task OnConnectedAsync(MqttClientConnectedEventArgs arg)
+	private async Task OnConnectedAsync(MqttClientConnectedEventArgs arg)
 	{
 		Console.WriteLine($"[{_serviceName}] Connected to MQTT broker at {GetEndpointLabel()} using {GetTransportLabel()} with client id '{_options.ClientId}'.");
 
@@ -305,15 +312,15 @@ internal sealed class MqttServiceRuntime : IAsyncDisposable
 	{
 		var detail = DescribeDisconnect(arg.Exception?.Message ?? arg.ReasonString ?? "Disconnected.");
 		Console.WriteLine($"[{_serviceName}] MQTT disconnected from {GetEndpointLabel()}: {detail}");
-      StartReconnectLoop();
+		StartReconnectLoop();
 		return Task.CompletedTask;
 	}
 
-    private async Task OnMessageReceivedAsync(MqttApplicationMessageReceivedEventArgs arg)
+	private async Task OnMessageReceivedAsync(MqttApplicationMessageReceivedEventArgs arg)
 	{
 		Console.WriteLine($"[{_serviceName}] Received message on topic: {arg.ApplicationMessage.Topic}");
 
-      if (_messageHandler is null)
+		if (_messageHandler is null)
 		{
 			return;
 		}
@@ -471,14 +478,16 @@ internal sealed class GpioControllerCoordinator : IAsyncDisposable
 {
 	private readonly MqttServiceRuntime _mqttRuntime;
 
-    private readonly GpioBoardSerialConnectionManager _boardSerialConnectionManager;
+	private readonly GpioBoardSerialConnectionManager _boardSerialConnectionManager;
 
 	private readonly GpioControllerTopicFactory _topics;
 
 	private readonly GpioControllerConfigStore _configStore;
 
 	private GpioControllerConfigPayload _currentConfig;
+
 	private bool _hasPublishedConnectedSnapshot;
+
 	private string _startupStatusDetail;
 
 	public GpioControllerCoordinator(MqttServiceRuntime mqttRuntime, GpioControllerTopicFactory topics)
@@ -487,25 +496,25 @@ internal sealed class GpioControllerCoordinator : IAsyncDisposable
 		ArgumentNullException.ThrowIfNull(topics);
 
 		_mqttRuntime = mqttRuntime;
-       _boardSerialConnectionManager = new GpioBoardSerialConnectionManager();
+		_boardSerialConnectionManager = new GpioBoardSerialConnectionManager();
 		_topics = topics;
-        _configStore = new GpioControllerConfigStore();
+		_configStore = new GpioControllerConfigStore();
 		_currentConfig = GpioControllerConfigPayload.Empty;
-       _startupStatusDetail = "GPIO controller ready for UI config over MQTT.";
+		_startupStatusDetail = "GPIO controller ready for UI config over MQTT.";
 	}
 
-   public Task StartAsync(CancellationToken cancellationToken)
+	public Task StartAsync(CancellationToken cancellationToken)
 	{
-     _startupStatusDetail = LoadPersistedConfig();
+		_startupStatusDetail = LoadPersistedConfig();
 		return Task.CompletedTask;
 	}
 
- public async Task HandleConnectedAsync(CancellationToken cancellationToken)
+	public async Task HandleConnectedAsync(CancellationToken cancellationToken)
 	{
 		await _mqttRuntime.SubscribeAsync(_topics.AllCommandsTopicFilter, cancellationToken).ConfigureAwait(false);
-     var detail = _hasPublishedConnectedSnapshot
-			? "GPIO controller reconnected to MQTT broker."
-			: _startupStatusDetail;
+		var detail = _hasPublishedConnectedSnapshot
+			   ? "GPIO controller reconnected to MQTT broker."
+			   : _startupStatusDetail;
 
 		await PublishBirthSnapshotAsync(detail, cancellationToken).ConfigureAwait(false);
 		_hasPublishedConnectedSnapshot = true;
@@ -530,7 +539,7 @@ internal sealed class GpioControllerCoordinator : IAsyncDisposable
 		if (string.Equals(topic, _topics.ClearConfigTopic, StringComparison.OrdinalIgnoreCase))
 		{
 			_currentConfig = GpioControllerConfigPayload.Empty;
-         _configStore.Clear();
+			_configStore.Clear();
 			await PublishConfigSnapshotAsync(CancellationToken.None).ConfigureAwait(false);
 			await PublishStatusAsync("GPIO controller config cleared.", CancellationToken.None).ConfigureAwait(false);
 		}
@@ -538,7 +547,7 @@ internal sealed class GpioControllerCoordinator : IAsyncDisposable
 
 	public ValueTask DisposeAsync()
 	{
-     _boardSerialConnectionManager.Dispose();
+		_boardSerialConnectionManager.Dispose();
 		return ValueTask.CompletedTask;
 	}
 
@@ -555,8 +564,8 @@ internal sealed class GpioControllerCoordinator : IAsyncDisposable
 
 			ValidateConfig(config);
 			_currentConfig = config;
-          _configStore.Save(config);
-          _boardSerialConnectionManager.ApplyConfig(_currentConfig);
+			_configStore.Save(config);
+			_boardSerialConnectionManager.ApplyConfig(_currentConfig);
 			await PublishConfigSnapshotAsync(cancellationToken).ConfigureAwait(false);
 			await PublishStatusAsync("GPIO controller config applied.", cancellationToken).ConfigureAwait(false);
 		}
@@ -570,7 +579,7 @@ internal sealed class GpioControllerCoordinator : IAsyncDisposable
 		}
 	}
 
-   private async Task PublishBirthSnapshotAsync(string detail, CancellationToken cancellationToken)
+	private async Task PublishBirthSnapshotAsync(string detail, CancellationToken cancellationToken)
 	{
 		await _mqttRuntime.PublishAsync(
 			_topics.ServiceRegistryTopic,
@@ -579,7 +588,7 @@ internal sealed class GpioControllerCoordinator : IAsyncDisposable
 			cancellationToken: cancellationToken).ConfigureAwait(false);
 
 		await PublishConfigSnapshotAsync(cancellationToken).ConfigureAwait(false);
-      await PublishStatusAsync(detail, cancellationToken).ConfigureAwait(false);
+		await PublishStatusAsync(detail, cancellationToken).ConfigureAwait(false);
 	}
 
 	private string LoadPersistedConfig()
@@ -589,7 +598,7 @@ internal sealed class GpioControllerCoordinator : IAsyncDisposable
 			var persistedConfig = _configStore.Load();
 			ValidateConfig(persistedConfig);
 			_currentConfig = persistedConfig;
-            _boardSerialConnectionManager.ApplyConfig(_currentConfig);
+			_boardSerialConnectionManager.ApplyConfig(_currentConfig);
 			return _currentConfig == GpioControllerConfigPayload.Empty
 				? "GPIO controller ready for UI config over MQTT."
 				: "GPIO controller loaded persisted config."
@@ -905,6 +914,7 @@ internal sealed record GpioBoardSerialConnection(
 internal enum GpioBoardCategory
 {
 	RelayBoard = 0,
+
 	DigitalInputBoard = 1
 }
 
@@ -924,6 +934,7 @@ internal static class GpioBoardCategoryExtensions
 internal static class GpioBoardType
 {
 	public const string UppercaseATrigger = "A trigger";
+
 	public const string LowercaseATrigger = "a trigger";
 
 	private static readonly HashSet<string> SupportedBoardTypes = new(StringComparer.Ordinal)
@@ -941,6 +952,7 @@ internal static class GpioBoardType
 internal sealed class GpioControllerConfigStore
 {
 	private const string ConfigFileName = "gpio-controller.config.json";
+
 	private readonly IGpioControllerStoredConfig _storedConfig;
 
 	public GpioControllerConfigStore()

@@ -1,4 +1,21 @@
-﻿using MQTTnet;
+﻿// %%%%%%    @%%%%%@
+//%%%%%%%%   %%%%%%%@
+//@%%%%%%%@  %%%%%%%%%        @@      @@  @@@      @@@ @@@     @@@ @@@@@@@@@@   @@@@@@@@@
+//%%%%%%%%@ @%%%%%%%%       @@@@@   @@@@ @@@@@   @@@@ @@@@   @@@@ @@@@@@@@@@@@@@@@@@@@@@@ @@@@
+// @%%%%%%%%  %%%%%%%%%      @@@@@@  @@@@  @@@@  @@@@   @@@@@@@@@     @@@@    @@@@         @@@@
+//  %%%%%%%%%  %%%%%%%%@     @@@@@@@ @@@@   @@@@@@@@     @@@@@@       @@@@    @@@@@@@@@@@  @@@@
+//   %%%%%%%%@  %%%%%%%%%    @@@@@@@@@@@@     @@@@        @@@@@       @@@@    @@@@@@@@@@@  @@@@
+//    %%%%%%%%@ @%%%%%%%%    @@@@ @@@@@@@     @@@@      @@@@@@@@      @@@@    @@@@         @@@@
+//    @%%%%%%%%% @%%%%%%%%   @@@@   @@@@@     @@@@     @@@@@ @@@@@    @@@@    @@@@@@@@@@@@ @@@@@@@@@@
+//     @%%%%%%%%  %%%%%%%%@  @@@@    @@@@     @@@@    @@@@     @@@@   @@@@    @@@@@@@@@@@@ @@@@@@@@@@@
+//      %%%%%%%%@ @%%%%%%%%
+//      @%%%%%%%%  @%%%%%%%%
+//       %%%%%%%%   %%%%%%%@
+//         %%%%%      %%%%
+//
+// Copyright (C) 2025-2026 NyxTel Wireless / Nyx Gallini
+//
+using MQTTnet;
 using MQTTnet.Formatter;
 using System.Text.Json;
 using Config.Net;
@@ -6,8 +23,8 @@ using Config.Net;
 using var instanceLock = SingleInstanceLock.TryAcquire("myforce-siren-interface");
 if (instanceLock is null)
 {
-    Console.WriteLine("[siren-interface] Another Siren Interface instance is already running. Exiting to avoid MQTT client id takeover.");
-    return;
+	Console.WriteLine("[siren-interface] Another Siren Interface instance is already running. Exiting to avoid MQTT client id takeover.");
+	return;
 }
 
 var sirenInterface = new SirenInterfaceMqttApp();
@@ -15,433 +32,447 @@ await sirenInterface.RunAsync();
 
 internal sealed class SirenInterfaceMqttApp
 {
-    private readonly MqttServiceRuntime _mqttRuntime;
-    private readonly PeriodicTimer _statusHeartbeatTimer = new(TimeSpan.FromSeconds(5));
-    private Task? _statusHeartbeatTask;
-    private readonly string _serviceStatusTopic = "myforce/siren/status/service";
-    private readonly MqttLastWillMessage _lastWillMessage;
+	private readonly MqttServiceRuntime _mqttRuntime;
 
-    public SirenInterfaceMqttApp()
-    {
-        var lastWillPayload = JsonSerializer.Serialize(new SirenServiceStatusPayload("siren-interface", "Stopped", "Heartbeat stopped."));
-        _lastWillMessage = new MqttLastWillMessage(_serviceStatusTopic, lastWillPayload, true);
-        _mqttRuntime = new MqttServiceRuntime("siren-interface", _lastWillMessage);
-        _mqttRuntime.SetConnectedHandler(PublishStatusAsync);
-    }
+	private readonly PeriodicTimer _statusHeartbeatTimer = new(TimeSpan.FromSeconds(5));
 
-    public async Task RunAsync()
-    {
-        using var cts = new CancellationTokenSource();
-        Console.CancelKeyPress += (_, e) =>
-        {
-            e.Cancel = true;
-            cts.Cancel();
-        };
+	private Task? _statusHeartbeatTask;
 
-        await _mqttRuntime.ConnectAsync(cts.Token);
-        await PublishStatusAsync(cts.Token);
-        _statusHeartbeatTask = RunStatusHeartbeatAsync(cts.Token);
-        Console.WriteLine("Siren Interface MQTT framework ready.");
-        await _mqttRuntime.RunUntilStoppedAsync(cts.Token);
-    }
+	private readonly string _serviceStatusTopic = "myforce/siren/status/service";
 
-    public async ValueTask DisposeAsync()
-    {
-        _statusHeartbeatTimer.Dispose();
+	private readonly MqttLastWillMessage _lastWillMessage;
 
-        if (_statusHeartbeatTask is not null)
-        {
-            try
-            {
-                await _statusHeartbeatTask.ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-            }
-        }
+	public SirenInterfaceMqttApp()
+	{
+		var lastWillPayload = JsonSerializer.Serialize(new SirenServiceStatusPayload("siren-interface", "Stopped", "Heartbeat stopped."));
+		_lastWillMessage = new MqttLastWillMessage(_serviceStatusTopic, lastWillPayload, true);
+		_mqttRuntime = new MqttServiceRuntime("siren-interface", _lastWillMessage);
+		_mqttRuntime.SetConnectedHandler(PublishStatusAsync);
+	}
 
-        await _mqttRuntime.DisposeAsync().ConfigureAwait(false);
-    }
+	public async Task RunAsync()
+	{
+		using var cts = new CancellationTokenSource();
+		Console.CancelKeyPress += (_, e) =>
+		{
+			e.Cancel = true;
+			cts.Cancel();
+		};
 
-    /// <summary>
-    /// Publishes the Siren Interface heartbeat payload so the UI can actively monitor service freshness.
-    /// </summary>
-    private async Task PublishStatusAsync(CancellationToken cancellationToken)
-    {
-        var payload = JsonSerializer.Serialize(new SirenServiceStatusPayload(
-            ServiceId: "siren-interface",
-            State: "Running",
-            Detail: $"Heartbeat: {DateTime.UtcNow:O}"));
-        await _mqttRuntime.PublishAsync(_serviceStatusTopic, payload, retain: true, cancellationToken).ConfigureAwait(false);
-    }
+		await _mqttRuntime.ConnectAsync(cts.Token);
+		await PublishStatusAsync(cts.Token);
+		_statusHeartbeatTask = RunStatusHeartbeatAsync(cts.Token);
+		Console.WriteLine("Siren Interface MQTT framework ready.");
+		await _mqttRuntime.RunUntilStoppedAsync(cts.Token);
+	}
 
-    private async Task RunStatusHeartbeatAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            while (await _statusHeartbeatTimer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
-            {
-                await PublishStatusAsync(cancellationToken).ConfigureAwait(false);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-        }
-    }
+	public async ValueTask DisposeAsync()
+	{
+		_statusHeartbeatTimer.Dispose();
+
+		if (_statusHeartbeatTask is not null)
+		{
+			try
+			{
+				await _statusHeartbeatTask.ConfigureAwait(false);
+			}
+			catch (OperationCanceledException)
+			{
+			}
+		}
+
+		await _mqttRuntime.DisposeAsync().ConfigureAwait(false);
+	}
+
+	/// <summary>
+	/// Publishes the Siren Interface heartbeat payload so the UI can actively monitor service freshness.
+	/// </summary>
+	private async Task PublishStatusAsync(CancellationToken cancellationToken)
+	{
+		var payload = JsonSerializer.Serialize(new SirenServiceStatusPayload(
+			ServiceId: "siren-interface",
+			State: "Running",
+			Detail: $"Heartbeat: {DateTime.UtcNow:O}"));
+		await _mqttRuntime.PublishAsync(_serviceStatusTopic, payload, retain: true, cancellationToken).ConfigureAwait(false);
+	}
+
+	private async Task RunStatusHeartbeatAsync(CancellationToken cancellationToken)
+	{
+		try
+		{
+			while (await _statusHeartbeatTimer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+			{
+				await PublishStatusAsync(cancellationToken).ConfigureAwait(false);
+			}
+		}
+		catch (OperationCanceledException)
+		{
+		}
+	}
 }
 
 internal sealed class MqttServiceRuntime : IAsyncDisposable
 {
-    private readonly IMqttClient _client;
-    private readonly Lock _syncRoot = new();
-    private readonly CancellationTokenSource _lifetimeCancellationTokenSource = new();
-    private readonly MqttLastWillMessage? _lastWillMessage;
-    private readonly MqttServiceOptions _options;
-    private readonly string _serviceName;
-    private MqttClientOptions? _clientOptions;
-    private Task? _reconnectTask;
-    private bool _isDisposed;
-    private bool _isReconnectLoopRunning;
-    private Func<CancellationToken, Task>? _connectedHandler;
+	private readonly IMqttClient _client;
 
-    public MqttServiceRuntime(string serviceName, MqttLastWillMessage? lastWillMessage = null)
-    {
-        _serviceName = serviceName;
-        _lastWillMessage = lastWillMessage;
-        _options = MqttServiceOptions.Load(serviceName);
-        _client = new MqttClientFactory().CreateMqttClient();
-        _client.ConnectedAsync += OnConnectedAsync;
-        _client.DisconnectedAsync += OnDisconnectedAsync;
-        _client.ApplicationMessageReceivedAsync += OnMessageReceivedAsync;
-    }
+	private readonly Lock _syncRoot = new();
 
-    public async Task ConnectAsync(CancellationToken cancellationToken)
-    {
-        ObjectDisposedException.ThrowIf(_isDisposed, this);
+	private readonly CancellationTokenSource _lifetimeCancellationTokenSource = new();
 
-        Console.WriteLine($"[{_serviceName}] MQTT configured for {GetEndpointLabel()} using {GetTransportLabel()}.");
+	private readonly MqttLastWillMessage? _lastWillMessage;
 
-        var optionsBuilder = new MqttClientOptionsBuilder()
-            .WithProtocolVersion(MqttProtocolVersion.V500)
-            .WithClientId(_options.ClientId)
-            .WithTcpServer(_options.Host, _options.Port)
-            .WithCleanSession();
+	private readonly MqttServiceOptions _options;
 
-        if (_lastWillMessage is not null)
-        {
-            optionsBuilder = optionsBuilder
-                .WithWillTopic(_lastWillMessage.Topic)
-                .WithWillPayload(_lastWillMessage.Payload)
-                .WithWillRetain(_lastWillMessage.Retain);
-        }
+	private readonly string _serviceName;
 
-        if (!string.IsNullOrWhiteSpace(_options.Username))
-        {
-            optionsBuilder = optionsBuilder.WithCredentials(_options.Username, _options.Password);
-        }
+	private MqttClientOptions? _clientOptions;
 
-        if (_options.UseTls)
-        {
-            optionsBuilder = optionsBuilder.WithTlsOptions(static builder => builder.UseTls());
-        }
+	private Task? _reconnectTask;
 
-        _clientOptions = optionsBuilder.Build();
-        await TryConnectAsync(cancellationToken).ConfigureAwait(false);
-        StartReconnectLoop();
-    }
+	private bool _isDisposed;
 
-    public void SetConnectedHandler(Func<CancellationToken, Task> connectedHandler)
-    {
-        ArgumentNullException.ThrowIfNull(connectedHandler);
-        _connectedHandler = connectedHandler;
-    }
+	private bool _isReconnectLoopRunning;
 
-    public async Task SubscribeAsync(string topicFilter, CancellationToken cancellationToken = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(topicFilter);
-        if (!_client.IsConnected)
-        {
-            Console.WriteLine($"[{_serviceName}] Subscribe skipped while MQTT is offline: {topicFilter}");
-            return;
-        }
+	private Func<CancellationToken, Task>? _connectedHandler;
 
-        var subscribeOptions = new MqttClientSubscribeOptionsBuilder()
-            .WithTopicFilter(topicFilter)
-            .Build();
+	public MqttServiceRuntime(string serviceName, MqttLastWillMessage? lastWillMessage = null)
+	{
+		_serviceName = serviceName;
+		_lastWillMessage = lastWillMessage;
+		_options = MqttServiceOptions.Load(serviceName);
+		_client = new MqttClientFactory().CreateMqttClient();
+		_client.ConnectedAsync += OnConnectedAsync;
+		_client.DisconnectedAsync += OnDisconnectedAsync;
+		_client.ApplicationMessageReceivedAsync += OnMessageReceivedAsync;
+	}
 
-        try
-        {
-            await _client.SubscribeAsync(subscribeOptions, cancellationToken).ConfigureAwait(false);
-            Console.WriteLine($"[{_serviceName}] Subscribed: {topicFilter}");
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[{_serviceName}] Subscribe failed for {topicFilter}: {ex.Message}");
-        }
-    }
+	public async Task ConnectAsync(CancellationToken cancellationToken)
+	{
+		ObjectDisposedException.ThrowIf(_isDisposed, this);
 
-    public async Task PublishAsync(string topic, string payload, bool retain = false, CancellationToken cancellationToken = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(topic);
-        if (!_client.IsConnected)
-        {
-            Console.WriteLine($"[{_serviceName}] Publish skipped while MQTT is offline: {topic}");
-            return;
-        }
+		Console.WriteLine($"[{_serviceName}] MQTT configured for {GetEndpointLabel()} using {GetTransportLabel()}.");
 
-        var message = new MqttApplicationMessageBuilder()
-            .WithTopic(topic)
-            .WithPayload(payload)
-            .WithRetainFlag(retain)
-            .Build();
+		var optionsBuilder = new MqttClientOptionsBuilder()
+			.WithProtocolVersion(MqttProtocolVersion.V500)
+			.WithClientId(_options.ClientId)
+			.WithTcpServer(_options.Host, _options.Port)
+			.WithCleanSession();
 
-        try
-        {
-            await _client.PublishAsync(message, cancellationToken).ConfigureAwait(false);
-            Console.WriteLine($"[{_serviceName}] Published: {topic}");
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[{_serviceName}] Publish failed for {topic}: {ex.Message}");
-        }
-    }
+		if (_lastWillMessage is not null)
+		{
+			optionsBuilder = optionsBuilder
+				.WithWillTopic(_lastWillMessage.Topic)
+				.WithWillPayload(_lastWillMessage.Payload)
+				.WithWillRetain(_lastWillMessage.Retain);
+		}
 
-    public async Task RunUntilStoppedAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        finally
-        {
-            await DisposeAsync();
-        }
-    }
+		if (!string.IsNullOrWhiteSpace(_options.Username))
+		{
+			optionsBuilder = optionsBuilder.WithCredentials(_options.Username, _options.Password);
+		}
 
-    public async ValueTask DisposeAsync()
-    {
-        Task? reconnectTask;
+		if (_options.UseTls)
+		{
+			optionsBuilder = optionsBuilder.WithTlsOptions(static builder => builder.UseTls());
+		}
 
-        lock (_syncRoot)
-        {
-            if (_isDisposed)
-            {
-                return;
-            }
+		_clientOptions = optionsBuilder.Build();
+		await TryConnectAsync(cancellationToken).ConfigureAwait(false);
+		StartReconnectLoop();
+	}
 
-            _isDisposed = true;
-            reconnectTask = _reconnectTask;
-        }
+	public void SetConnectedHandler(Func<CancellationToken, Task> connectedHandler)
+	{
+		ArgumentNullException.ThrowIfNull(connectedHandler);
+		_connectedHandler = connectedHandler;
+	}
 
-        await _lifetimeCancellationTokenSource.CancelAsync().ConfigureAwait(false);
-        _client.ConnectedAsync -= OnConnectedAsync;
-        _client.DisconnectedAsync -= OnDisconnectedAsync;
-        _client.ApplicationMessageReceivedAsync -= OnMessageReceivedAsync;
+	public async Task SubscribeAsync(string topicFilter, CancellationToken cancellationToken = default)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(topicFilter);
+		if (!_client.IsConnected)
+		{
+			Console.WriteLine($"[{_serviceName}] Subscribe skipped while MQTT is offline: {topicFilter}");
+			return;
+		}
 
-        if (reconnectTask is not null)
-        {
-            try
-            {
-                await reconnectTask.ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-            }
-        }
+		var subscribeOptions = new MqttClientSubscribeOptionsBuilder()
+			.WithTopicFilter(topicFilter)
+			.Build();
 
-        if (_client.IsConnected)
-        {
-            await _client.DisconnectAsync().ConfigureAwait(false);
-        }
+		try
+		{
+			await _client.SubscribeAsync(subscribeOptions, cancellationToken).ConfigureAwait(false);
+			Console.WriteLine($"[{_serviceName}] Subscribed: {topicFilter}");
+		}
+		catch (OperationCanceledException)
+		{
+			throw;
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"[{_serviceName}] Subscribe failed for {topicFilter}: {ex.Message}");
+		}
+	}
 
-        _client.Dispose();
-        _lifetimeCancellationTokenSource.Dispose();
-    }
+	public async Task PublishAsync(string topic, string payload, bool retain = false, CancellationToken cancellationToken = default)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(topic);
+		if (!_client.IsConnected)
+		{
+			Console.WriteLine($"[{_serviceName}] Publish skipped while MQTT is offline: {topic}");
+			return;
+		}
 
-    private async Task OnConnectedAsync(MqttClientConnectedEventArgs arg)
-    {
-        Console.WriteLine($"[{_serviceName}] Connected to MQTT broker at {GetEndpointLabel()} using {GetTransportLabel()} with client id '{_options.ClientId}'.");
+		var message = new MqttApplicationMessageBuilder()
+			.WithTopic(topic)
+			.WithPayload(payload)
+			.WithRetainFlag(retain)
+			.Build();
 
-        if (_connectedHandler is null)
-        {
-            return;
-        }
+		try
+		{
+			await _client.PublishAsync(message, cancellationToken).ConfigureAwait(false);
+			Console.WriteLine($"[{_serviceName}] Published: {topic}");
+		}
+		catch (OperationCanceledException)
+		{
+			throw;
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"[{_serviceName}] Publish failed for {topic}: {ex.Message}");
+		}
+	}
 
-        try
-        {
-            await _connectedHandler(_lifetimeCancellationTokenSource.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (_lifetimeCancellationTokenSource.IsCancellationRequested)
-        {
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[{_serviceName}] MQTT connected handler failed: {ex.Message}");
-        }
-    }
+	public async Task RunUntilStoppedAsync(CancellationToken cancellationToken)
+	{
+		try
+		{
+			await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+		}
+		catch (OperationCanceledException)
+		{
+		}
+		finally
+		{
+			await DisposeAsync();
+		}
+	}
 
-    private Task OnDisconnectedAsync(MqttClientDisconnectedEventArgs arg)
-    {
-        var detail = DescribeDisconnect(arg.Exception?.Message ?? arg.ReasonString ?? "Disconnected.");
-        Console.WriteLine($"[{_serviceName}] MQTT disconnected from {GetEndpointLabel()}: {detail}");
-        StartReconnectLoop();
-        return Task.CompletedTask;
-    }
+	public async ValueTask DisposeAsync()
+	{
+		Task? reconnectTask;
 
-    private Task OnMessageReceivedAsync(MqttApplicationMessageReceivedEventArgs arg)
-    {
-        Console.WriteLine($"[{_serviceName}] Received message on topic: {arg.ApplicationMessage.Topic}");
-        return Task.CompletedTask;
-    }
+		lock (_syncRoot)
+		{
+			if (_isDisposed)
+			{
+				return;
+			}
 
-    private async Task TryConnectAsync(CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(_clientOptions);
+			_isDisposed = true;
+			reconnectTask = _reconnectTask;
+		}
 
-        try
-        {
-            await _client.ConnectAsync(_clientOptions, cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[{_serviceName}] Initial MQTT connect failed for {GetEndpointLabel()} using {GetTransportLabel()} with client id '{_options.ClientId}': {ex.Message}");
-        }
-    }
+		await _lifetimeCancellationTokenSource.CancelAsync().ConfigureAwait(false);
+		_client.ConnectedAsync -= OnConnectedAsync;
+		_client.DisconnectedAsync -= OnDisconnectedAsync;
+		_client.ApplicationMessageReceivedAsync -= OnMessageReceivedAsync;
 
-    private void StartReconnectLoop()
-    {
-        lock (_syncRoot)
-        {
-            if (_isDisposed || _isReconnectLoopRunning || _client.IsConnected || _clientOptions is null)
-            {
-                return;
-            }
+		if (reconnectTask is not null)
+		{
+			try
+			{
+				await reconnectTask.ConfigureAwait(false);
+			}
+			catch (OperationCanceledException)
+			{
+			}
+		}
 
-            _isReconnectLoopRunning = true;
-            _reconnectTask = RunReconnectLoopAsync();
-        }
-    }
+		if (_client.IsConnected)
+		{
+			await _client.DisconnectAsync().ConfigureAwait(false);
+		}
 
-    private async Task RunReconnectLoopAsync()
-    {
-        try
-        {
-            while (!_lifetimeCancellationTokenSource.IsCancellationRequested)
-            {
-                if (_client.IsConnected)
-                {
-                    return;
-                }
+		_client.Dispose();
+		_lifetimeCancellationTokenSource.Dispose();
+	}
 
-                try
-                {
-                    ArgumentNullException.ThrowIfNull(_clientOptions);
-                    Console.WriteLine($"[{_serviceName}] Attempting MQTT reconnect to {GetEndpointLabel()} using {GetTransportLabel()} with client id '{_options.ClientId}'.");
-                    await _client.ConnectAsync(_clientOptions, _lifetimeCancellationTokenSource.Token).ConfigureAwait(false);
-                    return;
-                }
-                catch (OperationCanceledException) when (_lifetimeCancellationTokenSource.IsCancellationRequested)
-                {
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[{_serviceName}] MQTT reconnect failed for {GetEndpointLabel()} using {GetTransportLabel()} with client id '{_options.ClientId}': {ex.Message}");
-                }
+	private async Task OnConnectedAsync(MqttClientConnectedEventArgs arg)
+	{
+		Console.WriteLine($"[{_serviceName}] Connected to MQTT broker at {GetEndpointLabel()} using {GetTransportLabel()} with client id '{_options.ClientId}'.");
 
-                await Task.Delay(TimeSpan.FromSeconds(1), _lifetimeCancellationTokenSource.Token).ConfigureAwait(false);
-            }
-        }
-        catch (OperationCanceledException) when (_lifetimeCancellationTokenSource.IsCancellationRequested)
-        {
-        }
-        finally
-        {
-            lock (_syncRoot)
-            {
-                _isReconnectLoopRunning = false;
-                _reconnectTask = null;
-            }
+		if (_connectedHandler is null)
+		{
+			return;
+		}
 
-            if (!_isDisposed && !_client.IsConnected)
-            {
-                StartReconnectLoop();
-            }
-        }
-    }
+		try
+		{
+			await _connectedHandler(_lifetimeCancellationTokenSource.Token).ConfigureAwait(false);
+		}
+		catch (OperationCanceledException) when (_lifetimeCancellationTokenSource.IsCancellationRequested)
+		{
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"[{_serviceName}] MQTT connected handler failed: {ex.Message}");
+		}
+	}
 
-    private string GetEndpointLabel()
-    {
-        return $"{_options.Host}:{_options.Port}";
-    }
+	private Task OnDisconnectedAsync(MqttClientDisconnectedEventArgs arg)
+	{
+		var detail = DescribeDisconnect(arg.Exception?.Message ?? arg.ReasonString ?? "Disconnected.");
+		Console.WriteLine($"[{_serviceName}] MQTT disconnected from {GetEndpointLabel()}: {detail}");
+		StartReconnectLoop();
+		return Task.CompletedTask;
+	}
 
-    private string GetTransportLabel()
-    {
-        return _options.UseTls ? "encrypted MQTT" : "unencrypted MQTT";
-    }
+	private Task OnMessageReceivedAsync(MqttApplicationMessageReceivedEventArgs arg)
+	{
+		Console.WriteLine($"[{_serviceName}] Received message on topic: {arg.ApplicationMessage.Topic}");
+		return Task.CompletedTask;
+	}
 
-    private string DescribeDisconnect(string detail)
-    {
-        if (detail.Contains("SessionTakenOver", StringComparison.OrdinalIgnoreCase))
-        {
-            return $"{detail} Another connection is using MQTT client id '{_options.ClientId}'. Ensure only one Siren Interface instance is running.";
-        }
+	private async Task TryConnectAsync(CancellationToken cancellationToken)
+	{
+		ArgumentNullException.ThrowIfNull(_clientOptions);
 
-        return detail;
-    }
+		try
+		{
+			await _client.ConnectAsync(_clientOptions, cancellationToken).ConfigureAwait(false);
+		}
+		catch (OperationCanceledException)
+		{
+			throw;
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"[{_serviceName}] Initial MQTT connect failed for {GetEndpointLabel()} using {GetTransportLabel()} with client id '{_options.ClientId}': {ex.Message}");
+		}
+	}
+
+	private void StartReconnectLoop()
+	{
+		lock (_syncRoot)
+		{
+			if (_isDisposed || _isReconnectLoopRunning || _client.IsConnected || _clientOptions is null)
+			{
+				return;
+			}
+
+			_isReconnectLoopRunning = true;
+			_reconnectTask = RunReconnectLoopAsync();
+		}
+	}
+
+	private async Task RunReconnectLoopAsync()
+	{
+		try
+		{
+			while (!_lifetimeCancellationTokenSource.IsCancellationRequested)
+			{
+				if (_client.IsConnected)
+				{
+					return;
+				}
+
+				try
+				{
+					ArgumentNullException.ThrowIfNull(_clientOptions);
+					Console.WriteLine($"[{_serviceName}] Attempting MQTT reconnect to {GetEndpointLabel()} using {GetTransportLabel()} with client id '{_options.ClientId}'.");
+					await _client.ConnectAsync(_clientOptions, _lifetimeCancellationTokenSource.Token).ConfigureAwait(false);
+					return;
+				}
+				catch (OperationCanceledException) when (_lifetimeCancellationTokenSource.IsCancellationRequested)
+				{
+					return;
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"[{_serviceName}] MQTT reconnect failed for {GetEndpointLabel()} using {GetTransportLabel()} with client id '{_options.ClientId}': {ex.Message}");
+				}
+
+				await Task.Delay(TimeSpan.FromSeconds(1), _lifetimeCancellationTokenSource.Token).ConfigureAwait(false);
+			}
+		}
+		catch (OperationCanceledException) when (_lifetimeCancellationTokenSource.IsCancellationRequested)
+		{
+		}
+		finally
+		{
+			lock (_syncRoot)
+			{
+				_isReconnectLoopRunning = false;
+				_reconnectTask = null;
+			}
+
+			if (!_isDisposed && !_client.IsConnected)
+			{
+				StartReconnectLoop();
+			}
+		}
+	}
+
+	private string GetEndpointLabel()
+	{
+		return $"{_options.Host}:{_options.Port}";
+	}
+
+	private string GetTransportLabel()
+	{
+		return _options.UseTls ? "encrypted MQTT" : "unencrypted MQTT";
+	}
+
+	private string DescribeDisconnect(string detail)
+	{
+		if (detail.Contains("SessionTakenOver", StringComparison.OrdinalIgnoreCase))
+		{
+			return $"{detail} Another connection is using MQTT client id '{_options.ClientId}'. Ensure only one Siren Interface instance is running.";
+		}
+
+		return detail;
+	}
 }
 
 internal sealed class SingleInstanceLock : IDisposable
 {
-    private readonly Mutex _mutex;
+	private readonly Mutex _mutex;
 
-    private SingleInstanceLock(Mutex mutex)
-    {
-        _mutex = mutex;
-    }
+	private SingleInstanceLock(Mutex mutex)
+	{
+		_mutex = mutex;
+	}
 
-    public static SingleInstanceLock? TryAcquire(string name)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+	public static SingleInstanceLock? TryAcquire(string name)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
-        var mutex = new Mutex(initiallyOwned: false, $"Global\\{name}");
+		var mutex = new Mutex(initiallyOwned: false, $"Global\\{name}");
 
-        try
-        {
-            if (!mutex.WaitOne(TimeSpan.Zero, exitContext: false))
-            {
-                mutex.Dispose();
-                return null;
-            }
+		try
+		{
+			if (!mutex.WaitOne(TimeSpan.Zero, exitContext: false))
+			{
+				mutex.Dispose();
+				return null;
+			}
 
-            return new SingleInstanceLock(mutex);
-        }
-        catch (AbandonedMutexException)
-        {
-            return new SingleInstanceLock(mutex);
-        }
-    }
+			return new SingleInstanceLock(mutex);
+		}
+		catch (AbandonedMutexException)
+		{
+			return new SingleInstanceLock(mutex);
+		}
+	}
 
-    public void Dispose()
-    {
-        _mutex.ReleaseMutex();
-        _mutex.Dispose();
-    }
+	public void Dispose()
+	{
+		_mutex.ReleaseMutex();
+		_mutex.Dispose();
+	}
 }
 
 internal sealed record MqttLastWillMessage(string Topic, string Payload, bool Retain);
@@ -449,61 +480,61 @@ internal sealed record MqttLastWillMessage(string Topic, string Payload, bool Re
 internal sealed record SirenServiceStatusPayload(string ServiceId, string State, string Detail);
 
 internal sealed record MqttServiceOptions(
-    string Host,
-    int Port,
-    string ClientId,
-    bool UseTls,
-    string? Username,
-    string? Password)
+	string Host,
+	int Port,
+	string ClientId,
+	bool UseTls,
+	string? Username,
+	string? Password)
 {
-    public static MqttServiceOptions Load(string serviceName)
-    {
-        var normalizedServiceName = serviceName.Replace(' ', '-').ToLowerInvariant();
-        var configStore = new SirenInterfaceConfigStore();
-        var clientId = configStore.StoredConfig.MqttClientId;
+	public static MqttServiceOptions Load(string serviceName)
+	{
+		var normalizedServiceName = serviceName.Replace(' ', '-').ToLowerInvariant();
+		var configStore = new SirenInterfaceConfigStore();
+		var clientId = configStore.StoredConfig.MqttClientId;
 
-        return new MqttServiceOptions(
-            Host: string.IsNullOrWhiteSpace(configStore.StoredConfig.MqttHost) ? "127.0.0.1" : configStore.StoredConfig.MqttHost,
-            Port: int.TryParse(configStore.StoredConfig.MqttPort, out var port) ? port : 1883,
-            ClientId: string.IsNullOrWhiteSpace(clientId) ? $"myforce-{normalizedServiceName}-{Environment.MachineName}" : clientId,
-            UseTls: false,
-            Username: configStore.StoredConfig.MqttUsername,
-            Password: configStore.StoredConfig.MqttPassword);
-    }
+		return new MqttServiceOptions(
+			Host: string.IsNullOrWhiteSpace(configStore.StoredConfig.MqttHost) ? "127.0.0.1" : configStore.StoredConfig.MqttHost,
+			Port: int.TryParse(configStore.StoredConfig.MqttPort, out var port) ? port : 1883,
+			ClientId: string.IsNullOrWhiteSpace(clientId) ? $"myforce-{normalizedServiceName}-{Environment.MachineName}" : clientId,
+			UseTls: false,
+			Username: configStore.StoredConfig.MqttUsername,
+			Password: configStore.StoredConfig.MqttPassword);
+	}
 }
 
 internal sealed class SirenInterfaceConfigStore
 {
-    private const string ConfigFileName = "siren-interface.config.json";
+	private const string ConfigFileName = "siren-interface.config.json";
 
-    public SirenInterfaceConfigStore()
-    {
-        var configPath = Path.Combine(AppContext.BaseDirectory, ConfigFileName);
-        var configDirectory = Path.GetDirectoryName(configPath);
-        if (!string.IsNullOrWhiteSpace(configDirectory))
-        {
-            Directory.CreateDirectory(configDirectory);
-        }
+	public SirenInterfaceConfigStore()
+	{
+		var configPath = Path.Combine(AppContext.BaseDirectory, ConfigFileName);
+		var configDirectory = Path.GetDirectoryName(configPath);
+		if (!string.IsNullOrWhiteSpace(configDirectory))
+		{
+			Directory.CreateDirectory(configDirectory);
+		}
 
-        StoredConfig = new ConfigurationBuilder<ISirenInterfaceStoredConfig>()
-            .UseJsonFile(configPath)
-            .Build();
-    }
+		StoredConfig = new ConfigurationBuilder<ISirenInterfaceStoredConfig>()
+			.UseJsonFile(configPath)
+			.Build();
+	}
 
-    public ISirenInterfaceStoredConfig StoredConfig { get; }
+	public ISirenInterfaceStoredConfig StoredConfig { get; }
 }
 
 public interface ISirenInterfaceStoredConfig
 {
-    string? MqttHost { get; set; }
+	string? MqttHost { get; set; }
 
-    string? MqttPort { get; set; }
+	string? MqttPort { get; set; }
 
-    string? MqttClientId { get; set; }
+	string? MqttClientId { get; set; }
 
-    string? MqttUseTls { get; set; }
+	string? MqttUseTls { get; set; }
 
-    string? MqttUsername { get; set; }
+	string? MqttUsername { get; set; }
 
-    string? MqttPassword { get; set; }
+	string? MqttPassword { get; set; }
 }
