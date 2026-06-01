@@ -2,7 +2,6 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:webview="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.WebView"
         xmlns:viewModels="using:MyForce.ViewModels"
         xmlns:models="using:MyForce.Models"
         xmlns:system="clr-namespace:System;assembly=System.Runtime"
@@ -916,11 +915,11 @@
                                         Width="884"
                                         Height="553"
                                         Padding="2">
-                                    <webview:NativeWebView Width="880"
-                                                           Height="549"
-                                                           HorizontalAlignment="Center"
-                                                           VerticalAlignment="Center"
-                                                           Source="https://embed.windy.com/embed2.html?radar,overlay=radar" />
+                                    <ContentControl x:Name="RadarHostContainer"
+                                                    Width="880"
+                                                    Height="549"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center" />
                                 </Border>
                             </Grid>
                         </Border>
