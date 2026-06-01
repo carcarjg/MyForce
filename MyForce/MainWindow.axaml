@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:webview="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.WebView"
         xmlns:viewModels="using:MyForce.ViewModels"
         xmlns:models="using:MyForce.Models"
         xmlns:system="clr-namespace:System;assembly=System.Runtime"
@@ -135,16 +136,16 @@
                   RowDefinitions="87,180,116,101,120,88"
                   RowSpacing="10">
                 <Border Grid.Row="0" Classes="panel" Width="304" Height="87" Padding="8">
-                    <Grid ColumnDefinitions="89,176" ColumnSpacing="9" HorizontalAlignment="Center">
-                        <StackPanel Width="89" Height="63" Spacing="0" HorizontalAlignment="Center" PointerPressed="OnSpeedPressed">
+                    <Grid ColumnDefinitions="84,182" ColumnSpacing="12" HorizontalAlignment="Center">
+                        <StackPanel Width="84" Height="63" Spacing="0" HorizontalAlignment="Center" PointerPressed="OnSpeedPressed">
                             <TextBlock Classes="white"
-                                       Width="89"
+                                       Width="84"
                                        Height="24"
                                        FontSize="18"
                                        TextAlignment="Center"
                                        Text="{Binding SpeedLabel}" />
                             <!-- Speed Information -->
-                            <TextBlock Width="89"
+                            <TextBlock Width="84"
                                        Height="42"
                                        Foreground="{StaticResource SignalBrush}"
                                        FontFamily="Segoe UI"
@@ -156,23 +157,30 @@
                             
                         </StackPanel>
 
-                        <StackPanel Grid.Column="1" Width="176" Height="63" Spacing="0" HorizontalAlignment="Center">
+                        <StackPanel Grid.Column="1" Width="182" Height="63" Spacing="0" HorizontalAlignment="Center">
                             <TextBlock Classes="white"
-                                       Width="176"
+                                       Width="182"
                                        Height="24"
                                        FontSize="18"
                                        TextAlignment="Center"
                                        Text="{Binding LocationLabel}" />
                             <!-- Location Information -->
-                            <TextBlock Width="176"
+                            <Viewbox Width="182"
+                                     Height="42"
+                                     Stretch="Uniform"
+                                     StretchDirection="DownOnly"
+                                     HorizontalAlignment="Center"
+                                     VerticalAlignment="Center">
+                                <TextBlock Width="182"
                                        Height="42"
                                        Foreground="{StaticResource SignalBrush}"
                                        FontFamily="Segoe UI"
                                        FontWeight="Bold"
-                                       FontSize="18"
+                                       FontSize="19"
                                        TextAlignment="Center"
                                        VerticalAlignment="Center"
                                        Text="{Binding LocationValue}" />
+                            </Viewbox>
 
                         </StackPanel>
                     </Grid>
@@ -348,19 +356,26 @@
                 <Border Grid.Row="5" Classes="panel" Width="298" Height="88" Padding="8">
                     <Grid Width="280"
                           Height="70"
-                          ColumnDefinitions="128,65,69"
+                           ColumnDefinitions="132,61,75"
                           ColumnSpacing="6">
                         <!-- Clock and Date -->
-                        <StackPanel Width="128" Height="64" Spacing="0">
+                        <StackPanel Width="132" Height="64" Spacing="0">
+                            <Viewbox Width="132"
+                                     Height="34"
+                                     Stretch="Uniform"
+                                     StretchDirection="DownOnly"
+                                     HorizontalAlignment="Center"
+                                     VerticalAlignment="Center">
+                                <TextBlock Classes="white"
+                                           Width="132"
+                                           Height="34"
+                                           FontSize="30"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Center"
+                                           Text="{Binding Clock}" />
+                            </Viewbox>
                             <TextBlock Classes="white"
-                                       Width="128"
-                                       Height="34"
-                                       FontSize="28"
-                                       VerticalAlignment="Center"
-                                       HorizontalAlignment="Center"
-                                       Text="{Binding Clock}" />
-                            <TextBlock Classes="white"
-                                       Width="128"
+                                       Width="132"
                                        Height="23"
                                        FontSize="15"
                                        VerticalAlignment="Center"
@@ -370,14 +385,14 @@
                         </StackPanel>
 
                         <!-- Current Channel Volume -->
-                        <StackPanel Grid.Column="1" Width="65" Height="64" Spacing="0">
+                        <StackPanel Grid.Column="1" Width="61" Height="64" Spacing="0">
                             <TextBlock Classes="white"
-                                       Width="65"
+                                       Width="61"
                                        Height="26"
                                        FontSize="20"
                                        TextAlignment="Center"
                                        Text="VOL" />
-                            <TextBlock Width="65"
+                            <TextBlock Width="61"
                                        Height="37"
                                        Foreground="{StaticResource SignalBrush}"
                                        FontFamily="Segoe UI"
@@ -388,7 +403,7 @@
                         </StackPanel>
 
                         <Border Grid.Column="2"
-                                Width="69"
+                                Width="75"
                                 Height="64"
                                 Background="{StaticResource AlertBrush}"
                                 BorderBrush="{StaticResource ActiveButtonBorderBrush}"
@@ -877,18 +892,36 @@
                                 Width="916"
                                 Height="637"
                                 IsVisible="{Binding IsRadarContentVisible}"
-                                Padding="24">
-                            <Grid RowDefinitions="Auto,*"
-                                  RowSpacing="16">
-                                <TextBlock Classes="white"
-                                           FontSize="32"
-                                           Text="RADAR" />
-                                <TextBlock Grid.Row="1"
-                                           Classes="white"
-                                           FontSize="22"
-                                           VerticalAlignment="Center"
-                                           HorizontalAlignment="Center"
-                                           Text="Radar tab content coming next." />
+                                Padding="16">
+                            <Grid Width="884"
+                                  Height="605"
+                                  RowDefinitions="42,553"
+                                  RowSpacing="10">
+                                <Grid ColumnDefinitions="Auto,*"
+                                      ColumnSpacing="12"
+                                      VerticalAlignment="Center">
+                                    <TextBlock Classes="white"
+                                               FontSize="28"
+                                               VerticalAlignment="Center"
+                                               Text="LIVE WEATHER RADAR" />
+                                    <TextBlock Grid.Column="1"
+                                               Classes="white"
+                                               FontSize="16"
+                                               VerticalAlignment="Center"
+                                               HorizontalAlignment="Right"
+                                               Text="WINDY RADAR FEED" />
+                                </Grid>
+                                <Border Grid.Row="1"
+                                        Classes="panel"
+                                        Width="884"
+                                        Height="553"
+                                        Padding="2">
+                                    <webview:NativeWebView Width="880"
+                                                           Height="549"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           Source="https://embed.windy.com/embed2.html?radar,overlay=radar" />
+                                </Border>
                             </Grid>
                         </Border>
 
