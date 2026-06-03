@@ -2931,6 +2931,10 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
 
 	private const int MaxProcessDiagnosticLines = 20;
 
+	// PulseAudio/PipeWire application.name tag set on the ffplay stream so the AP can find its
+	// sink-input deterministically (by name) to apply the entertainment mixer gain.
+	internal const string EntertainmentSinkInputAppName = "myforce-entertainment";
+
 	private static readonly TimeSpan UnexpectedLinuxRestartResetWindow = TimeSpan.FromSeconds(30);
 
 	private readonly AudioProcessorConfigStore _configStore;
@@ -3185,6 +3189,7 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
 		var json = RunProcessCapture("pactl", "-f json list sink-inputs");
 		if (string.IsNullOrWhiteSpace(json))
 		{
+			AudioProcessorLog.Write("playback", "pactl returned no sink-input JSON (is PulseAudio/PipeWire-pulse available?).");
 			return null;
 		}
 
@@ -3196,23 +3201,56 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
 				return null;
 			}
 
+			var pidText = processId.ToString(CultureInfo.InvariantCulture);
+			int? byPid = null;
+			int? byBinary = null;
+			var seen = new List<string>();
+
 			foreach (var sinkInput in document.RootElement.EnumerateArray())
 			{
-				if (!sinkInput.TryGetProperty("properties", out var properties)
-					|| properties.ValueKind != JsonValueKind.Object
-					|| !properties.TryGetProperty("application.process.id", out var pidElement))
+				if (!sinkInput.TryGetProperty("index", out var indexElement) || !indexElement.TryGetInt32(out var index))
 				{
 					continue;
 				}
 
-				var pidText = pidElement.ValueKind == JsonValueKind.String ? pidElement.GetString() : pidElement.ToString();
-				if (string.Equals(pidText, processId.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal)
-					&& sinkInput.TryGetProperty("index", out var indexElement)
-					&& indexElement.TryGetInt32(out var index))
+				var properties = sinkInput.TryGetProperty("properties", out var props) && props.ValueKind == JsonValueKind.Object
+					? props
+					: default;
+
+				var appName = ReadProperty(properties, "application.name");
+				var binary = ReadProperty(properties, "application.process.binary");
+				var pid = ReadProperty(properties, "application.process.id");
+				seen.Add($"[{index}] name='{appName}' bin='{binary}' pid='{pid}'");
+
+				// Primary: our tagged stream. Most robust, independent of ffplay's PID reporting.
+				if (string.Equals(appName, EntertainmentSinkInputAppName, StringComparison.OrdinalIgnoreCase))
 				{
 					return index;
 				}
+
+				if (string.Equals(pid, pidText, StringComparison.Ordinal))
+				{
+					byPid ??= index;
+				}
+
+				if (string.Equals(binary, "ffplay", StringComparison.OrdinalIgnoreCase)
+					|| string.Equals(appName, "ffplay", StringComparison.OrdinalIgnoreCase))
+				{
+					byBinary ??= index;
+				}
 			}
+
+			if (byPid is not null)
+			{
+				return byPid;
+			}
+
+			if (byBinary is not null)
+			{
+				return byBinary;
+			}
+
+			AudioProcessorLog.Write("playback", $"No entertainment sink-input matched (pid {processId}). Present: {(seen.Count == 0 ? "<none>" : string.Join(" | ", seen))}");
 		}
 		catch (JsonException)
 		{
@@ -3220,6 +3258,16 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
 		}
 
 		return null;
+	}
+
+	private static string? ReadProperty(JsonElement properties, string key)
+	{
+		if (properties.ValueKind != JsonValueKind.Object || !properties.TryGetProperty(key, out var element))
+		{
+			return null;
+		}
+
+		return element.ValueKind == JsonValueKind.String ? element.GetString() : element.ToString();
 	}
 
 	/// <summary>Runs a short-lived process and returns stdout, or null on failure/non-zero exit.</summary>
@@ -3633,6 +3681,11 @@ internal sealed class LinuxPlayerCandidate
 		{
 			startInfo.Environment["PULSE_SINK"] = sinkName;
 		}
+
+		// Route ffplay through the Pulse/PipeWire driver and tag it with a known application.name so
+		// it appears as a controllable sink-input (the entertainment mixer input to the master output).
+		startInfo.Environment["SDL_AUDIODRIVER"] = "pulseaudio";
+		startInfo.Environment["PULSE_PROP"] = $"application.name={InternetRadioPlaybackController.EntertainmentSinkInputAppName}";
 
 		startInfo.ArgumentList.Add("-nodisp");
 		startInfo.ArgumentList.Add("-vn");
