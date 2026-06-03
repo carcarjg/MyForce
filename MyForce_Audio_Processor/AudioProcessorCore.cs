@@ -2043,37 +2043,47 @@ internal sealed class AudioFrameworkCatalog
 
 		try
 		{
+			// Enumerate ALL audio devices (project rule): PipeWire sinks first (proper names, and the
+			// path the entertainment gain can control), then any ALSA hardware NOT already represented
+			// by a sink, so every USB output stays selectable rather than disappearing once pactl works.
+			var merged = new List<AudioDevice>();
+			var coveredAlsaKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
 			var sinkJson = TryRunProcess("pactl", "-f json list sinks");
 			if (!string.IsNullOrWhiteSpace(sinkJson))
 			{
-				var devicesFromJson = ParsePlaybackDevicesFromJson(sinkJson);
-				if (devicesFromJson.Count > 0)
-				{
-					AudioProcessorLog.Write("discovery", $"Discovered {devicesFromJson.Count} Linux playback device(s) via pactl JSON sinks.");
-					return devicesFromJson;
-				}
+				merged.AddRange(ParsePlaybackDevicesFromJson(sinkJson, coveredAlsaKeys));
 			}
-
-			var sinkShortList = TryRunProcess("pactl", "list short sinks");
-			if (!string.IsNullOrWhiteSpace(sinkShortList))
+			else
 			{
-				var devicesFromShortList = ParsePlaybackDevicesFromShortList(sinkShortList);
-				if (devicesFromShortList.Count > 0)
+				var sinkShortList = TryRunProcess("pactl", "list short sinks");
+				if (!string.IsNullOrWhiteSpace(sinkShortList))
 				{
-					AudioProcessorLog.Write("discovery", $"Discovered {devicesFromShortList.Count} Linux playback device(s) via pactl short sinks.");
-					return devicesFromShortList;
+					merged.AddRange(ParsePlaybackDevicesFromShortList(sinkShortList));
 				}
 			}
 
 			var alsaHardwareList = TryRunProcess("aplay", "-l");
 			if (!string.IsNullOrWhiteSpace(alsaHardwareList))
 			{
-				var devicesFromAlsa = ParsePlaybackDevicesFromAlsaHardwareList(alsaHardwareList);
-				if (devicesFromAlsa.Count > 0)
+				foreach (var device in ParsePlaybackDevicesFromAlsaHardwareList(alsaHardwareList))
 				{
-					AudioProcessorLog.Write("discovery", $"Discovered {devicesFromAlsa.Count} Linux playback device(s) via ALSA hardware enumeration.");
-					return devicesFromAlsa;
+					var alsaKey = device.Id.Value.StartsWith("alsa:", StringComparison.OrdinalIgnoreCase)
+						? device.Id.Value["alsa:".Length..]
+						: device.Id.Value;
+					if (coveredAlsaKeys.Contains(alsaKey))
+					{
+						continue;
+					}
+
+					merged.Add(device);
 				}
+			}
+
+			if (merged.Count > 0)
+			{
+				AudioProcessorLog.Write("discovery", $"Discovered {merged.Count} Linux playback device(s) (PipeWire sinks plus uncovered ALSA hardware).");
+				return CreateOrderedPlaybackDeviceList(merged);
 			}
 
 			AudioProcessorLog.Write("discovery", "No Linux playback devices were discovered. Falling back to the synthetic system default output.");
@@ -2122,7 +2132,7 @@ internal sealed class AudioFrameworkCatalog
 			: null;
 	}
 
-	private static IReadOnlyList<AudioDevice> ParsePlaybackDevicesFromJson(string output)
+	private static IReadOnlyList<AudioDevice> ParsePlaybackDevicesFromJson(string output, ISet<string>? coveredAlsaKeys = null)
 	{
 		using var json = JsonDocument.Parse(output);
 		if (json.RootElement.ValueKind != JsonValueKind.Array)
@@ -2160,10 +2170,48 @@ internal sealed class AudioFrameworkCatalog
 				displayName = deviceDescriptionElement.GetString()!;
 			}
 
+			// Record the ALSA hw this sink wraps so the hardware enumeration can skip the duplicate.
+			var alsaKey = ExtractAlsaHwKey(sink);
+			if (alsaKey is not null)
+			{
+				coveredAlsaKeys?.Add(alsaKey);
+			}
+
 			devices.Add(new AudioDevice(new AudioDeviceId(deviceId), displayName, "speaker", false, true));
 		}
 
 		return CreateOrderedPlaybackDeviceList(devices);
+	}
+
+	/// <summary>
+	/// Best-effort mapping of a PipeWire/Pulse sink to its underlying ALSA "hw:card,device" id, so the
+	/// merged device list does not show the same physical output twice. Returns null when unknown.
+	/// </summary>
+	private static string? ExtractAlsaHwKey(JsonElement sink)
+	{
+		if (!sink.TryGetProperty("properties", out var properties) || properties.ValueKind != JsonValueKind.Object)
+		{
+			return null;
+		}
+
+		var card = ReadStringProperty(properties, "alsa.card") ?? ReadStringProperty(properties, "api.alsa.pcm.card");
+		if (string.IsNullOrWhiteSpace(card))
+		{
+			return null;
+		}
+
+		var device = ReadStringProperty(properties, "alsa.device") ?? ReadStringProperty(properties, "api.alsa.pcm.device") ?? "0";
+		return $"hw:{card},{device}";
+	}
+
+	private static string? ReadStringProperty(JsonElement properties, string key)
+	{
+		if (!properties.TryGetProperty(key, out var element))
+		{
+			return null;
+		}
+
+		return element.ValueKind == JsonValueKind.String ? element.GetString() : element.ToString();
 	}
 
 	private static IReadOnlyList<AudioDevice> ParsePlaybackDevicesFromShortList(string output)
