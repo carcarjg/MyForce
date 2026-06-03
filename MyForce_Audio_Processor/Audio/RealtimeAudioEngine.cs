@@ -126,16 +126,26 @@ internal sealed class RealtimeAudioEngine : IDisposable
 	{
 		while (_isRunning)
 		{
-			if (!_backend.WaitNextFrame())
+			try
 			{
-				break;
+				if (!_backend.WaitNextFrame())
+				{
+					break;
+				}
+
+				DrainCommands();
+
+				var snapshot = Volatile.Read(ref _snapshot);
+				CaptureSources(snapshot);
+				MixSinks(snapshot);
 			}
-
-			DrainCommands();
-
-			var snapshot = Volatile.Read(ref _snapshot);
-			CaptureSources(snapshot);
-			MixSinks(snapshot);
+			catch (Exception ex) when (ex is not OutOfMemoryException)
+			{
+				// Resilience: a transient backend/device fault must not kill the audio thread or the
+				// process. Skip this frame and continue; the device-loss path marks ports Unavailable.
+				// (Logging is normally banned on the RT path, but this is the rare error branch.)
+				_log("engine", $"RT audio frame error (continuing): {ex.Message}");
+			}
 		}
 	}
 

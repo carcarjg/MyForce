@@ -222,6 +222,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	private int _amFmVolume = 25;
 
+	// Master output volume (0..25) driven by the PATROL screen volume buttons; sets the master sink level.
+	private int _masterVolume = 18;
+
 	private decimal _amFrequency = 87.5m;
 
 	private bool _isAmFmMuted;
@@ -1578,9 +1581,26 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		RaiseAmFmStateChanged();
 	}
 
+	// PATROL screen volume buttons control the master output volume (the master sink level).
+	public string MasterVolumeDisplay => $"VOLUME: {_masterVolume}";
+
+	public void IncreaseMasterVolume()
+	{
+		_masterVolume = Math.Min(_masterVolume + 1, MaxSourceVolume);
+		PublishMasterVolumeCommand();
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MasterVolumeDisplay)));
+	}
+
+	public void DecreaseMasterVolume()
+	{
+		_masterVolume = Math.Max(_masterVolume - 1, 0);
+		PublishMasterVolumeCommand();
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MasterVolumeDisplay)));
+	}
+
 	public void IncreaseAmFmVolume()
 	{
-		_amFmVolume = Math.Min(_amFmVolume + 1, 40);
+		_amFmVolume = Math.Min(_amFmVolume + 1, MaxSourceVolume);
 		SaveAmFmUiState();
 		PublishEntertainmentVolumeCommand();
 		RaiseAmFmStateChanged();
@@ -2175,6 +2195,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		_ = PublishCommandAsync(AudioProcessorChannelGainCommandTopic, command);
 	}
 
+	/// <summary>Publishes the master output volume (the master sink level) to the AP.</summary>
+	private void PublishMasterVolumeCommand()
+	{
+		var command = CreateAudioChannelGainCommandMessage("master", MapEntertainmentVolumeToGain(_masterVolume));
+		_ = PublishCommandAsync(InternetRadioMqttTopics.SpecMasterVolumeCommandTopic, command);
+	}
+
 	private async Task PublishOutputSpeakerCommandAsync(string deviceId)
 	{
 		ArgumentException.ThrowIfNullOrWhiteSpace(deviceId);
@@ -2505,7 +2532,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		_internetPresetStationNames = NormalizeInternetPresets(savedState.InternetPresets);
 		_bluetoothDisplayLabel = string.IsNullOrWhiteSpace(savedState.BluetoothLabel) ? "BT AUDIO" : savedState.BluetoothLabel;
 		_isAmFmMuted = savedState.IsMuted;
-		_amFmVolume = Math.Clamp(savedState.Volume, 0, 40);
+		_amFmVolume = Math.Clamp(savedState.Volume, 0, MaxSourceVolume);
 
 		if (!string.IsNullOrWhiteSpace(savedState.InternetStreamUrl))
 		{
@@ -2793,10 +2820,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 			?? deviceId.ToUpperInvariant();
 	}
 
+	// All source/master volumes are an integer 0..25 where 0 = 0% and 25 = 100% (unity gain 1.0).
+	private const int MaxSourceVolume = 25;
+
 	private static decimal MapEntertainmentVolumeToGain(int volume)
 	{
-		var normalizedVolume = Math.Clamp(volume, 0, 40);
-		return decimal.Round(normalizedVolume / 20m, 2, MidpointRounding.AwayFromZero);
+		var normalizedVolume = Math.Clamp(volume, 0, MaxSourceVolume);
+		return decimal.Round(normalizedVolume / (decimal)MaxSourceVolume, 3, MidpointRounding.AwayFromZero);
 	}
 
 	private static string GetServiceStateLabel(JsonElement stateElement)

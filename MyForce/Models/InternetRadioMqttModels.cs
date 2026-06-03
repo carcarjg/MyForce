@@ -48,6 +48,8 @@ internal static class InternetRadioMqttTopics
 
 	public const string SpecSpeakerOutputCommandTopic = "myforce/module/audio.processor/cmd/output-speaker";
 
+	public const string SpecMasterVolumeCommandTopic = "myforce/module/audio.processor/cmd/master-volume";
+
 	public const string AudioProcessorRegistryTopic = "myforce/ap/registry/service";
 
 	public const string StateTopic = "myforce/ap/state/internet-radio";

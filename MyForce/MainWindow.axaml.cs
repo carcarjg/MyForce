@@ -384,10 +384,15 @@ public partial class MainWindow : Window
 	{ }
 
 	private void OnVolumeUpPressed(object? sender, PointerPressedEventArgs e)
-	{ }
+	{
+		// PATROL screen volume buttons drive the master output volume.
+		_viewModel.IncreaseMasterVolume();
+	}
 
 	private void OnVolumeDownPressed(object? sender, PointerPressedEventArgs e)
-	{ }
+	{
+		_viewModel.DecreaseMasterVolume();
+	}
 
 	private void OnCode1Pressed(object? sender, PointerPressedEventArgs e)
 	{

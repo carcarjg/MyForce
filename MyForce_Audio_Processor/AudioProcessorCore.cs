@@ -53,6 +53,9 @@ internal sealed class AudioProcessorCoordinator : IAsyncDisposable
 
 	private readonly InternetRadioPlaybackController _internetRadioController;
 
+	// Sound-effects source (§3.5): files + generated tones mixed into the master output.
+	private readonly SfxController _sfxController = new(AudioProcessorLog.Write);
+
 	private readonly AudioMixerState _mixerState;
 
 	private readonly AudioProcessorRoutingState _routingState;
@@ -634,6 +637,51 @@ internal sealed record PersistedBridgeMember(
 				outcome.Accepted ? null : "ptt",
 				outcome.Accepted ? null : "tx_rejected",
 				outcome.Accepted ? null : outcome.Detail).ConfigureAwait(false);
+			return;
+		}
+
+		if (string.Equals(topic, _topics.MasterVolumeCommandTopic, StringComparison.OrdinalIgnoreCase))
+		{
+			// Master output volume (the master sink level) is an OPERATING command (§4.6).
+			var msgId = GetMessageId(args.ApplicationMessage.Payload);
+			var command = AudioProcessorJson.Deserialize<AudioGainCommand>(args.ApplicationMessage.Payload);
+			if (command is null)
+			{
+				return;
+			}
+
+			_internetRadioController.SetMasterVolume(command.Gain);
+			await PublishCommandAckAsync(topic, msgId, "ok", null, null, null).ConfigureAwait(false);
+			return;
+		}
+
+		if (string.Equals(topic, _topics.SfxVolumeCommandTopic, StringComparison.OrdinalIgnoreCase))
+		{
+			var msgId = GetMessageId(args.ApplicationMessage.Payload);
+			var command = AudioProcessorJson.Deserialize<AudioGainCommand>(args.ApplicationMessage.Payload);
+			if (command is null)
+			{
+				return;
+			}
+
+			_sfxController.SetVolume(command.Gain);
+			await PublishCommandAckAsync(topic, msgId, "ok", null, null, null).ConfigureAwait(false);
+			return;
+		}
+
+		if (string.Equals(topic, _topics.SfxPlayCommandTopic, StringComparison.OrdinalIgnoreCase))
+		{
+			var msgId = GetMessageId(args.ApplicationMessage.Payload);
+			var command = AudioProcessorJson.Deserialize<SfxPlayCommand>(args.ApplicationMessage.Payload);
+			if (command is null)
+			{
+				return;
+			}
+
+			_sfxController.Play(
+				new SfxRequest(command.Kind, command.Path, command.FrequencyHz, command.DurationMs),
+				_internetRadioController.GetMasterSinkName());
+			await PublishCommandAckAsync(topic, msgId, "ok", null, null, null).ConfigureAwait(false);
 			return;
 		}
 
@@ -1264,9 +1312,9 @@ internal sealed record PersistedBridgeMember(
 	/// </summary>
 	private async Task RunVoxPollLoopAsync(CancellationToken cancellationToken)
 	{
-		try
+		while (!cancellationToken.IsCancellationRequested)
 		{
-			while (!cancellationToken.IsCancellationRequested)
+			try
 			{
 				var nowMs = Environment.TickCount64;
 				foreach (var (radioValue, detector) in _voxDetectors)
@@ -1294,9 +1342,24 @@ internal sealed record PersistedBridgeMember(
 
 				await Task.Delay(TimeSpan.FromMilliseconds(20), cancellationToken).ConfigureAwait(false);
 			}
-		}
-		catch (OperationCanceledException)
-		{
+			catch (OperationCanceledException)
+			{
+				break;
+			}
+			catch (Exception ex) when (ex is not OutOfMemoryException)
+			{
+				// Resilience: one bad tick (publish failure, keying fault) must not stop VOX, bridges,
+				// or ducking. Log and continue on the next tick.
+				AudioProcessorLog.Write("control", $"Control tick error (continuing): {ex.Message}");
+				try
+				{
+					await Task.Delay(TimeSpan.FromMilliseconds(20), cancellationToken).ConfigureAwait(false);
+				}
+				catch (OperationCanceledException)
+				{
+					break;
+				}
+			}
 		}
 	}
 
@@ -2166,6 +2229,14 @@ internal sealed class AudioProcessorTopicFactory
 
 	public string AudioOutputCommandTopic => $"{ModuleRootTopic}/{AudioModuleId}/cmd/output-speaker";
 
+	public string MasterVolumeCommandTopic => $"{ModuleRootTopic}/{AudioModuleId}/cmd/master-volume";
+
+	public string SfxModuleId => "sfx";
+
+	public string SfxPlayCommandTopic => $"{ModuleRootTopic}/{SfxModuleId}/cmd/play";
+
+	public string SfxVolumeCommandTopic => $"{ModuleRootTopic}/{SfxModuleId}/cmd/volume";
+
 	public string AudioFrameworkSpecStateTopic => $"{ModuleRootTopic}/{AudioModuleId}/state";
 
 	public static bool TryParseModuleCommandTopic(string topic, out string moduleId, out string commandName)
@@ -2744,7 +2815,8 @@ internal sealed class AudioMixerState
 
 	private static decimal NormalizeGain(decimal gain)
 	{
-		return decimal.Clamp(gain, 0m, 2m);
+		// Source/master gains are 0..1 (0..100%) on the 0..25 operator volume scale.
+		return decimal.Clamp(gain, 0m, 1m);
 	}
 }
 
@@ -2888,6 +2960,15 @@ internal sealed class ConsolePttRequest
 internal sealed record MqttCommandEnvelope(string? MsgId, string? Auth);
 
 internal sealed record AudioChannelGainCommand(string ChannelId, decimal Gain);
+
+// Master output volume and SFX volume: gain 0..1 on the 0..25 operator scale (operating commands).
+internal sealed record AudioGainCommand(decimal Gain);
+
+internal sealed record SfxPlayCommand(
+	string? Kind,
+	string? Path,
+	[property: JsonPropertyName("frequency_hz")] int? FrequencyHz,
+	[property: JsonPropertyName("duration_ms")] int? DurationMs);
 
 internal sealed record AudioChannelMuteCommand(string ChannelId, bool IsMuted);
 
@@ -3466,6 +3547,9 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
 
 	private int _unexpectedLinuxRestartAttempts;
 
+	// 0/1 guard so at most one self-heal backoff loop runs at a time.
+	private int _selfHealRunning;
+
 	private DateTimeOffset? _linuxPlaybackStartedAtUtc;
 
 	public InternetRadioPlaybackController(AudioProcessorConfigStore configStore)
@@ -3613,6 +3697,31 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
 		AudioProcessorLog.Write("playback", $"Moved entertainment stream (sink-input {sinkInputIndex.Value}) to '{targetSink}'.");
 	}
 
+	/// <summary>The PipeWire sink that is the master output (where all source streams mix), or @DEFAULT_SINK@.</summary>
+	public string GetMasterSinkName() => ResolvePulseSinkName(_outputSpeakerDeviceId) ?? "@DEFAULT_SINK@";
+
+	/// <summary>
+	/// Sets the master output volume: the PipeWire master sink's own level, the final stage every source
+	/// stream (radios, entertainment, SFX) mixes into. Gain is 0..1 on the 0..25 operator scale (§3.5).
+	/// </summary>
+	public void SetMasterVolume(decimal gain)
+	{
+		if (!OperatingSystem.IsLinux())
+		{
+			return;
+		}
+
+		var sink = GetMasterSinkName();
+		var percent = Math.Clamp((int)Math.Round((double)decimal.Clamp(gain, 0m, 1m) * 100.0), 0, 100);
+		if (RunProcessCapture("pactl", $"set-sink-volume {sink} {percent}%") is null)
+		{
+			AudioProcessorLog.Write("playback", $"pactl set-sink-volume on '{sink}' failed.");
+			return;
+		}
+
+		AudioProcessorLog.Write("playback", $"Master output volume set to {percent}% on '{sink}'.");
+	}
+
 	/// <summary>
 	/// Starts internet radio playback on the default output device using the provided stream metadata.
 	/// </summary>
@@ -3719,7 +3828,8 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
 			return;
 		}
 
-		_outputGain = decimal.Clamp(gain, 0m, 2m);
+		// Gain is 0..1 (0..100%): the operator volume scale is 0..25 mapped to vol/25 by the UI.
+		_outputGain = decimal.Clamp(gain, 0m, 1m);
 		ApplyCurrentOutputGain();
 	}
 
@@ -3739,14 +3849,14 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
 		ApplyCurrentOutputGain();
 	}
 
-	/// <summary>The operator volume after the current ducking multiplier (§3.5).</summary>
-	private decimal EffectiveGain => decimal.Clamp(_outputGain * _duckFactor, 0m, 2m);
+	/// <summary>The operator volume (0..1) after the current ducking multiplier (§3.5).</summary>
+	private decimal EffectiveGain => decimal.Clamp(_outputGain * _duckFactor, 0m, 1m);
 
 	private void ApplyCurrentOutputGain()
 	{
 		if (_waveOut is not null)
 		{
-			_waveOut.Volume = (float)Math.Clamp(EffectiveGain / 2.0m, 0m, 1.0m);
+			_waveOut.Volume = (float)Math.Clamp(EffectiveGain, 0m, 1m);
 			return;
 		}
 
@@ -3782,7 +3892,7 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
 		}
 
 		// _outputGain is 0..2 (unity = 1.0). Map to a percent and cap to keep headroom below clipping.
-		var percent = Math.Clamp((int)Math.Round((double)EffectiveGain * 100.0), 0, 150);
+		var percent = Math.Clamp((int)Math.Round((double)EffectiveGain * 100.0), 0, 100);
 		var result = RunProcessCapture("pactl", $"set-sink-input-volume {sinkInputIndex.Value} {percent.ToString(CultureInfo.InvariantCulture)}%");
 		if (result is null)
 		{
@@ -4212,43 +4322,102 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
 
 	private void OnExternalPlayerExited(object? sender, EventArgs e)
 	{
-		var process = sender as Process;
-		if (process is null)
+		// This runs on a process event thread: it must never throw, or it would crash the whole AP.
+		try
 		{
-			return;
-		}
-
-		if (_isStoppingExternalPlayer)
-		{
-			return;
-		}
-
-		var exitCode = process.ExitCode;
-		ResetUnexpectedLinuxRestartAttemptsIfPlaybackWasStable();
-		var diagnostics = GetLinuxPlayerDiagnosticsSummary();
-		AudioProcessorLog.Write("playback", $"Linux internet radio player exited unexpectedly with code {exitCode}. Diagnostics: {diagnostics}");
-
-		if (_externalPlayerProcess == process)
-		{
-			_externalPlayerProcess.Exited -= OnExternalPlayerExited;
-			_externalPlayerProcess.ErrorDataReceived -= OnExternalPlayerDiagnosticReceived;
-			_externalPlayerProcess.OutputDataReceived -= OnExternalPlayerDiagnosticReceived;
-			_externalPlayerProcess.Dispose();
-			_externalPlayerProcess = null;
-			_activeBackend = null;
-
-			if (TryRestartLinuxPlaybackAfterUnexpectedExit(exitCode))
+			var process = sender as Process;
+			if (process is null || _isStoppingExternalPlayer)
 			{
 				return;
 			}
 
-			CurrentState = CurrentState with
+			var exitCode = process.ExitCode;
+			ResetUnexpectedLinuxRestartAttemptsIfPlaybackWasStable();
+			var diagnostics = GetLinuxPlayerDiagnosticsSummary();
+			AudioProcessorLog.Write("playback", $"Linux internet radio player exited unexpectedly with code {exitCode}. Diagnostics: {diagnostics}");
+
+			if (_externalPlayerProcess == process)
 			{
-				IsPlaying = false,
-				Status = "ERROR",
-				Detail = $"Linux internet radio playback stopped unexpectedly on {GetPlaybackBackendDescription()} (ffplay exit code {exitCode})."
-			};
+				_externalPlayerProcess.Exited -= OnExternalPlayerExited;
+				_externalPlayerProcess.ErrorDataReceived -= OnExternalPlayerDiagnosticReceived;
+				_externalPlayerProcess.OutputDataReceived -= OnExternalPlayerDiagnosticReceived;
+				_externalPlayerProcess.Dispose();
+				_externalPlayerProcess = null;
+				_activeBackend = null;
+
+				if (TryRestartLinuxPlaybackAfterUnexpectedExit(exitCode))
+				{
+					return;
+				}
+
+				CurrentState = CurrentState with
+				{
+					IsPlaying = false,
+					Status = "ERROR",
+					Detail = $"Linux internet radio playback stopped on {GetPlaybackBackendDescription()} (ffplay exit code {exitCode}); self-healing."
+				};
+
+				// Immediate retries exhausted: keep trying on a backoff so a flaky stream/network self-heals
+				// instead of staying dead. Stops when the operator stops playback or it recovers.
+				ScheduleDelayedSelfHeal();
+			}
 		}
+		catch (Exception ex) when (ex is not OutOfMemoryException)
+		{
+			AudioProcessorLog.Write("playback", $"Internet radio exit handler error (suppressed): {ex.Message}");
+		}
+	}
+
+	/// <summary>
+	/// Resilience: after immediate retries are exhausted, periodically retry the active stream on a
+	/// backoff until it recovers or the operator stops it. At most one heal loop runs at a time.
+	/// </summary>
+	private void ScheduleDelayedSelfHeal()
+	{
+		if (_activeCommand is null || _isStoppingExternalPlayer)
+		{
+			return;
+		}
+
+		if (Interlocked.CompareExchange(ref _selfHealRunning, 1, 0) != 0)
+		{
+			return; // a heal loop is already running
+		}
+
+		_ = Task.Run(async () =>
+		{
+			try
+			{
+				while (!_isStoppingExternalPlayer && _activeCommand is not null && !CurrentState.IsPlaying)
+				{
+					await Task.Delay(TimeSpan.FromSeconds(15)).ConfigureAwait(false);
+					if (_isStoppingExternalPlayer || _activeCommand is null || CurrentState.IsPlaying)
+					{
+						break;
+					}
+
+					var command = _activeCommand;
+					AudioProcessorLog.Write("playback", "Self-heal: retrying internet radio playback after backoff.");
+					try
+					{
+						_unexpectedLinuxRestartAttempts = 0;
+						await PlayAsync(command, CancellationToken.None).ConfigureAwait(false);
+					}
+					catch (Exception ex) when (ex is not OutOfMemoryException)
+					{
+						AudioProcessorLog.Write("playback", $"Self-heal attempt failed (will retry): {ex.Message}");
+					}
+				}
+			}
+			catch (Exception ex) when (ex is not OutOfMemoryException)
+			{
+				AudioProcessorLog.Write("playback", $"Self-heal loop error (suppressed): {ex.Message}");
+			}
+			finally
+			{
+				Interlocked.Exchange(ref _selfHealRunning, 0);
+			}
+		});
 	}
 
 	public ValueTask DisposeAsync()
@@ -4294,16 +4463,17 @@ internal sealed class LinuxPlayerCandidate
 		startInfo.ArgumentList.Add("-hide_banner");
 		startInfo.ArgumentList.Add("-loglevel");
 		startInfo.ArgumentList.Add("error");
+		// Entertainment audio does not need low latency. The aggressive +nobuffer / low_delay flags
+		// can abort ffplay mid-stream (the exit-134 pattern), so keep normal buffering and just drop
+		// corrupt packets; reconnect on transient network drops.
 		startInfo.ArgumentList.Add("-fflags");
-		startInfo.ArgumentList.Add("+discardcorrupt+nobuffer");
-		startInfo.ArgumentList.Add("-flags");
-		startInfo.ArgumentList.Add("low_delay");
+		startInfo.ArgumentList.Add("+discardcorrupt");
 		startInfo.ArgumentList.Add("-reconnect");
 		startInfo.ArgumentList.Add("1");
 		startInfo.ArgumentList.Add("-reconnect_streamed");
 		startInfo.ArgumentList.Add("1");
 		startInfo.ArgumentList.Add("-reconnect_delay_max");
-		startInfo.ArgumentList.Add("2");
+		startInfo.ArgumentList.Add("5");
 		startInfo.ArgumentList.Add("-rw_timeout");
 		startInfo.ArgumentList.Add("15000000");
 		startInfo.ArgumentList.Add("-volume");
@@ -4329,16 +4499,17 @@ internal sealed class LinuxPlayerCandidate
 		startInfo.ArgumentList.Add("-hide_banner");
 		startInfo.ArgumentList.Add("-loglevel");
 		startInfo.ArgumentList.Add("error");
+		// Entertainment audio does not need low latency. The aggressive +nobuffer / low_delay flags
+		// can abort ffplay mid-stream (the exit-134 pattern), so keep normal buffering and just drop
+		// corrupt packets; reconnect on transient network drops.
 		startInfo.ArgumentList.Add("-fflags");
-		startInfo.ArgumentList.Add("+discardcorrupt+nobuffer");
-		startInfo.ArgumentList.Add("-flags");
-		startInfo.ArgumentList.Add("low_delay");
+		startInfo.ArgumentList.Add("+discardcorrupt");
 		startInfo.ArgumentList.Add("-reconnect");
 		startInfo.ArgumentList.Add("1");
 		startInfo.ArgumentList.Add("-reconnect_streamed");
 		startInfo.ArgumentList.Add("1");
 		startInfo.ArgumentList.Add("-reconnect_delay_max");
-		startInfo.ArgumentList.Add("2");
+		startInfo.ArgumentList.Add("5");
 		startInfo.ArgumentList.Add("-rw_timeout");
 		startInfo.ArgumentList.Add("15000000");
 		startInfo.ArgumentList.Add("-volume");

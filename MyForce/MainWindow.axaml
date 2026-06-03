@@ -626,7 +626,7 @@
                                                    Height="32"
                                                    FontSize="18"
                                                    TextAlignment="Center"
-                                                   Text="VOLUME" />
+                                                   Text="{Binding MasterVolumeDisplay}" />
                                         <Grid Grid.Row="1"
                                               Width="276"
                                               Height="78"

@@ -26,8 +26,32 @@ if (instanceLock is null)
 	return;
 }
 
-await using var processor = new AudioProcessorMqttApp();
-await processor.RunAsync();
+// Resilience: never let a stray background exception (e.g. a media-player event thread or an
+// unobserved task) take the AP down. Log it and keep running; the radios/keying are the priority.
+AppDomain.CurrentDomain.UnhandledException += static (_, e) =>
+	AudioProcessorLog.Write("fatal", $"Unhandled exception (continuing): {(e.ExceptionObject as Exception)?.ToString() ?? e.ExceptionObject?.ToString() ?? "<unknown>"}");
+
+TaskScheduler.UnobservedTaskException += static (_, e) =>
+{
+	AudioProcessorLog.Write("fatal", $"Unobserved task exception (observed/suppressed): {e.Exception.Message}");
+	e.SetObserved();
+};
+
+try
+{
+	await using var processor = new AudioProcessorMqttApp();
+	await processor.RunAsync();
+}
+catch (OperationCanceledException)
+{
+	// Normal shutdown.
+}
+catch (Exception ex)
+{
+	// A fatal top-level failure is logged; systemd restarts the unit. Recoverable faults are handled
+	// inside the loops below and never reach here.
+	AudioProcessorLog.Write("fatal", $"Audio Processor terminated by an unhandled exception: {ex}");
+}
 
 internal static class AudioProcessorLog
 {
