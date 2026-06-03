@@ -74,6 +74,24 @@ internal sealed class AudioProcessorCoordinator : IAsyncDisposable
 
 	private readonly TxStateMachine _txStateMachine;
 
+	// Bridge engine (§3.5): arbitrates Call Detect into cross-patch routing and keying. The set of
+	// radios it currently keys and its routing edges are applied to the engine each control tick.
+	private readonly BridgeEngine _bridgeEngine;
+
+	private readonly HashSet<string> _bridgeKeyedRadios = new(StringComparer.OrdinalIgnoreCase);
+
+	private IReadOnlyList<BridgeRoutingEdge> _bridgeRoutingEdges = Array.Empty<BridgeRoutingEdge>();
+
+	// Ducking policy (§3.5): attenuate entertainment to this fraction while a radio is active, and
+	// restore after this much quiet. Defaults; promote to config later.
+	private const decimal DuckAttenuation = 0.25m;
+
+	private const long DuckRestoreHangMs = 1500;
+
+	private bool _entertainmentDucked;
+
+	private long _lastRadioActiveMs;
+
 	// VOX detect primitive (§3.6.8): one per radio that declares VOX, plus its RX source index
 	// and the latest Call Detect state the control-thread poll loop maintains.
 	private readonly Dictionary<string, VoxDetector> _voxDetectors;
@@ -134,6 +152,7 @@ internal sealed class AudioProcessorCoordinator : IAsyncDisposable
 			SetMicGate,
 			PublishRadioModuleStateAsync,
 			AudioProcessorLog.Write);
+		_bridgeEngine = new BridgeEngine(_registry.Bridges, AudioProcessorLog.Write);
 		_realtimeEngine.PublishRouting(BuildEngineRoutingSnapshot());
 		_internetRadioController.SetOutputSpeaker(_routingState.CurrentSnapshot.SpeakerSink.DeviceId);
 		AudioProcessorLog.Write("discovery", $"Audio framework initialized with {_audioFramework.Devices.Count(device => device.OutputEnabled && string.Equals(device.Role, "speaker", StringComparison.OrdinalIgnoreCase))} output speaker device(s).");
@@ -145,6 +164,7 @@ internal sealed class AudioProcessorCoordinator : IAsyncDisposable
 	{
 		await _mqttRuntime.SubscribeAsync(_topics.AllCommandsTopicFilter, cancellationToken).ConfigureAwait(false);
 		await _mqttRuntime.SubscribeAsync(_topics.AllModuleCommandsTopicFilter, cancellationToken).ConfigureAwait(false);
+		await _mqttRuntime.SubscribeAsync(_topics.AllBridgeCommandsTopicFilter, cancellationToken).ConfigureAwait(false);
 		await _mqttRuntime.SubscribeAsync(_topics.ConsolePttCommandTopicFilter, cancellationToken).ConfigureAwait(false);
 		await _radioModuleHostManager.StartAsync(cancellationToken).ConfigureAwait(false);
 
@@ -194,19 +214,21 @@ internal sealed record ModuleRadioStateSpecPayload(
 	string? Mode,
 	SignalInfo? Signal)
 {
-	public static ModuleRadioStateSpecPayload Create(RadioRuntimeDefinition radio, RadioTxState state, bool rxActive)
+	public static ModuleRadioStateSpecPayload Create(RadioRuntimeDefinition radio, RadioTxState state, bool rxActive, bool bridgeTxActive)
 	{
 		ArgumentNullException.ThrowIfNull(radio);
 		ArgumentNullException.ThrowIfNull(state);
 
-		var isTxActive = state.State is TxStatePhase.Keying or TxStatePhase.Transmitting or TxStatePhase.Tail;
+		// tx_active is keyed-now from EITHER manual PTT or a bridge repeating onto this radio (§5.8.5).
+		var isManualTx = state.State is TxStatePhase.Keying or TxStatePhase.Transmitting or TxStatePhase.Tail;
+		var isTxActive = isManualTx || bridgeTxActive;
 		return new ModuleRadioStateSpecPayload(
 			1,
 			DateTimeOffset.UtcNow,
 			radio.Id.Value,
 			RxActive: rxActive,                       // Call Detect from the VOX primitive (§3.6.8)
 			TxActive: isTxActive,
-			TxSource: isTxActive ? "manual" : "idle",
+			TxSource: isManualTx ? "manual" : bridgeTxActive ? "bridge" : "idle",
 			Channel: null,
 			Zone: null,
 			Mode: null,
@@ -445,15 +467,19 @@ internal sealed class AudioProcessorPersistedTopology
 
 	private AudioProcessorPersistedTopology(
 		IReadOnlyList<PersistedRadioDefinition> radioDefinitions,
-		IReadOnlyList<RelaySetDefinition> relaySets)
+		IReadOnlyList<RelaySetDefinition> relaySets,
+		IReadOnlyList<PersistedBridgeDefinition> bridges)
 	{
 		RadioDefinitions = radioDefinitions;
 		RelaySets = relaySets;
+		Bridges = bridges;
 	}
 
 	public IReadOnlyList<PersistedRadioDefinition> RadioDefinitions { get; }
 
 	public IReadOnlyList<RelaySetDefinition> RelaySets { get; }
+
+	public IReadOnlyList<PersistedBridgeDefinition> Bridges { get; }
 
 	public static AudioProcessorPersistedTopology Load(IAudioProcessorStoredConfig storedConfig)
 	{
@@ -461,7 +487,8 @@ internal sealed class AudioProcessorPersistedTopology
 
 		return new AudioProcessorPersistedTopology(
 			DeserializeList<PersistedRadioDefinition>(storedConfig.RadioDefinitionsJson),
-			DeserializeList<RelaySetDefinition>(storedConfig.RelaySetsJson));
+			DeserializeList<RelaySetDefinition>(storedConfig.RelaySetsJson),
+			DeserializeList<PersistedBridgeDefinition>(storedConfig.BridgesJson));
 	}
 
 	private static IReadOnlyList<T> DeserializeList<T>(string? json)
@@ -496,6 +523,18 @@ internal sealed record RelaySetDefinition(
 	string Protocol,
 	int ChannelCount);
 
+internal sealed record PersistedBridgeDefinition(
+	string BridgeId,
+	string Alias,
+	IReadOnlyList<PersistedBridgeMember>? Members,
+	int HangMs,
+	bool Enabled);
+
+internal sealed record PersistedBridgeMember(
+	string RadioId,
+	int Priority,
+	double TxGainDb);
+
 	/// <summary>
 	/// Reapplies retained subscriptions and republishes the current AP health snapshot after MQTT reconnects.
 	/// </summary>
@@ -503,6 +542,7 @@ internal sealed record RelaySetDefinition(
 	{
 		await _mqttRuntime.SubscribeAsync(_topics.AllCommandsTopicFilter, cancellationToken).ConfigureAwait(false);
 		await _mqttRuntime.SubscribeAsync(_topics.AllModuleCommandsTopicFilter, cancellationToken).ConfigureAwait(false);
+		await _mqttRuntime.SubscribeAsync(_topics.AllBridgeCommandsTopicFilter, cancellationToken).ConfigureAwait(false);
 		await _mqttRuntime.SubscribeAsync(_topics.ConsolePttCommandTopicFilter, cancellationToken).ConfigureAwait(false);
 		await PublishHeartbeatAsync(cancellationToken).ConfigureAwait(false);
 	}
@@ -520,6 +560,12 @@ internal sealed record RelaySetDefinition(
 		if (AudioProcessorTopicFactory.TryParseModuleCommandTopic(topic, out var moduleId, out var commandName)
 			&& await TryHandleSpecModuleCommandAsync(topic, moduleId, commandName, args.ApplicationMessage.Payload).ConfigureAwait(false))
 		{
+			return;
+		}
+
+		if (AudioProcessorTopicFactory.TryParseBridgeCommandTopic(topic, out var bridgeId, out var bridgeCommand))
+		{
+			await HandleBridgeCommandAsync(topic, bridgeId, bridgeCommand, args.ApplicationMessage.Payload).ConfigureAwait(false);
 			return;
 		}
 
@@ -902,6 +948,14 @@ internal sealed record RelaySetDefinition(
 
 		if (request.IsPressed)
 		{
+			// Manual vs. bridge contention (§3.5): while a bridge is actively repeating onto this radio,
+			// manual PTT is locked out unless the operator double-taps to override.
+			if (_bridgeEngine.IsRadioBridgeKeyed(request.RadioId) && !request.IsOverride)
+			{
+				AudioProcessorLog.Write("tx", $"Manual PTT on '{request.RadioId.Value}' locked out: a bridge is repeating onto it. Double-tap to override.");
+				return TxOutcome.Rejected("Locked out by an active bridge; double-tap PTT to override.");
+			}
+
 			var keyOutcome = await _txStateMachine.RequestKeyAsync(request.RadioId, request.IsOverride, cancellationToken).ConfigureAwait(false);
 			if (keyOutcome.Accepted)
 			{
@@ -1062,9 +1116,9 @@ internal sealed record RelaySetDefinition(
 	}
 
 	/// <summary>
-	/// Constructs the current routing snapshot: every radio RX monitored to the speaker at unity,
-	/// and the operator mic routed to the TX of each open-gated radio (§3.5). Bridge mix-minus is
-	/// Phase 2; this covers manual TX and RX monitoring.
+	/// Constructs the current routing snapshot: every radio RX monitored to the speaker at unity, the
+	/// operator mic routed to the TX of each open-gated radio (manual TX), and each active bridge's
+	/// holder RX repeated to the other members' TX as a mix-minus conference (§3.5).
 	/// </summary>
 	private EngineRoutingSnapshot BuildEngineRoutingSnapshot()
 	{
@@ -1075,14 +1129,22 @@ internal sealed record RelaySetDefinition(
 		}
 
 		string[] openGates;
+		IReadOnlyList<BridgeRoutingEdge> bridgeEdges;
 		lock (_engineRoutingGate)
 		{
 			openGates = _openMicGates.ToArray();
+			bridgeEdges = _bridgeRoutingEdges;
 		}
 
 		foreach (var radioValue in openGates)
 		{
 			builder.SetGain("mic", $"tx:{radioValue}", 1.0f);
+		}
+
+		// Bridge cross-patch: holder RX -> each other member TX at the member's configured gain (§3.5).
+		foreach (var edge in bridgeEdges)
+		{
+			builder.SetGain($"rx:{edge.SourceRx.Value}", $"tx:{edge.SinkTx.Value}", edge.Gain);
 		}
 
 		return builder.Build();
@@ -1100,7 +1162,7 @@ internal sealed record RelaySetDefinition(
 		var rxActive = _callDetectByRadio.TryGetValue(radioId.Value, out var detected) && detected;
 		await _mqttRuntime.PublishAsync(
 			_topics.ModuleStateTopic(radioId),
-			AudioProcessorJson.Serialize(ModuleRadioStateSpecPayload.Create(radio, _txStateMachine.GetState(radioId), rxActive)),
+			AudioProcessorJson.Serialize(ModuleRadioStateSpecPayload.Create(radio, _txStateMachine.GetState(radioId), rxActive, _bridgeEngine.IsRadioBridgeKeyed(radioId))),
 			retain: true,
 			cancellationToken: CancellationToken.None).ConfigureAwait(false);
 	}
@@ -1224,12 +1286,241 @@ internal sealed record RelaySetDefinition(
 					}
 				}
 
+				// Bridge arbitration runs on the same control tick, off the RT path (§3.5).
+				await EvaluateBridgesAsync(nowMs, cancellationToken).ConfigureAwait(false);
+
+				// Duck entertainment while any radio is active, restore after a hang (§3.5).
+				UpdateDucking(nowMs);
+
 				await Task.Delay(TimeSpan.FromMilliseconds(20), cancellationToken).ConfigureAwait(false);
 			}
 		}
 		catch (OperationCanceledException)
 		{
 		}
+	}
+
+	/// <summary>
+	/// One bridge-engine tick (§3.5): evaluate arbitration, key/unkey the changed members through the
+	/// AP keying primitives, refresh the engine routing edges, and republish bridge + member state.
+	/// </summary>
+	private async Task EvaluateBridgesAsync(long nowMs, CancellationToken cancellationToken)
+	{
+		var evaluation = _bridgeEngine.Evaluate(_callDetectByRadio, BuildManualTxActiveMap(), nowMs);
+
+		var desired = new HashSet<string>(evaluation.DesiredKeyedMembers.Select(static radio => radio.Value), StringComparer.OrdinalIgnoreCase);
+		var toKey = desired.Except(_bridgeKeyedRadios).ToArray();
+		var toUnkey = _bridgeKeyedRadios.Except(desired).ToArray();
+
+		foreach (var radioValue in toKey)
+		{
+			if (await KeyRadioAsync(new RadioId(radioValue), cancellationToken).ConfigureAwait(false))
+			{
+				_bridgeKeyedRadios.Add(radioValue);
+			}
+			else
+			{
+				AudioProcessorLog.Write("bridge", $"Bridge could not key member '{radioValue}'.");
+			}
+		}
+
+		foreach (var radioValue in toUnkey)
+		{
+			await UnkeyRadioAsync(new RadioId(radioValue), cancellationToken).ConfigureAwait(false);
+			_bridgeKeyedRadios.Remove(radioValue);
+		}
+
+		if (!evaluation.StateChanged && toKey.Length == 0 && toUnkey.Length == 0)
+		{
+			return;
+		}
+
+		lock (_engineRoutingGate)
+		{
+			_bridgeRoutingEdges = evaluation.RoutingEdges;
+		}
+
+		_realtimeEngine.PublishRouting(BuildEngineRoutingSnapshot());
+		await PublishBridgeStateAsync(cancellationToken).ConfigureAwait(false);
+
+		// Republish state for members whose bridge-keyed status changed so tx_active stays accurate.
+		foreach (var radioValue in toKey.Concat(toUnkey))
+		{
+			await PublishRadioModuleStateAsync(new RadioId(radioValue)).ConfigureAwait(false);
+		}
+	}
+
+	private Dictionary<string, bool> BuildManualTxActiveMap()
+	{
+		var map = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+		foreach (var radio in _registry.Radios)
+		{
+			var phase = _txStateMachine.GetState(radio.Id).State;
+			map[radio.Id.Value] = phase is TxStatePhase.Keying or TxStatePhase.Transmitting or TxStatePhase.Tail;
+		}
+
+		return map;
+	}
+
+	/// <summary>True when a radio is keyed by manual PTT or by a bridge repeating onto it.</summary>
+	private bool IsRadioTransmitting(RadioId radioId)
+	{
+		var phase = _txStateMachine.GetState(radioId).State;
+		return phase is TxStatePhase.Keying or TxStatePhase.Transmitting or TxStatePhase.Tail
+			|| _bridgeKeyedRadios.Contains(radioId.Value);
+	}
+
+	/// <summary>
+	/// Ducking policy (§3.5): attenuate the entertainment source while any radio is receiving (Call
+	/// Detect) or transmitting, then restore it after a short quiet hang so traffic is never buried.
+	/// </summary>
+	private void UpdateDucking(long nowMs)
+	{
+		var anyRadioActive = _callDetectByRadio.Values.Any(static active => active)
+			|| _registry.Radios.Any(radio => IsRadioTransmitting(radio.Id));
+
+		if (anyRadioActive)
+		{
+			_lastRadioActiveMs = nowMs;
+			if (!_entertainmentDucked)
+			{
+				_entertainmentDucked = true;
+				_internetRadioController.SetDuckLevel(DuckAttenuation);
+				AudioProcessorLog.Write("playback", "Ducking entertainment: radio activity detected.");
+			}
+
+			return;
+		}
+
+		if (_entertainmentDucked && nowMs - _lastRadioActiveMs >= DuckRestoreHangMs)
+		{
+			_entertainmentDucked = false;
+			_internetRadioController.SetDuckLevel(1.0m);
+			AudioProcessorLog.Write("playback", "Restoring entertainment level: radio activity cleared.");
+		}
+	}
+
+	private async Task PublishBridgeStateAsync(CancellationToken cancellationToken)
+	{
+		foreach (var state in _bridgeEngine.GetState(_callDetectByRadio))
+		{
+			await _mqttRuntime.PublishAsync(
+				_topics.BridgeStateTopic(state.Id),
+				AudioProcessorJson.Serialize(BridgeStatePayload.Create(state)),
+				retain: true,
+				cancellationToken: cancellationToken).ConfigureAwait(false);
+		}
+	}
+
+	private async Task PublishBridgeConfigAsync(CancellationToken cancellationToken)
+	{
+		foreach (var bridge in _bridgeEngine.Definitions)
+		{
+			await _mqttRuntime.PublishAsync(
+				_topics.BridgeConfigTopic(bridge.Id.Value),
+				AudioProcessorJson.Serialize(BridgeConfigPayload.Create(bridge)),
+				retain: true,
+				cancellationToken: cancellationToken).ConfigureAwait(false);
+		}
+	}
+
+	/// <summary>
+	/// Handles bridge commands (§5.5/§5.8.7): cmd/enable is an operating command (runtime toggle, §4.6);
+	/// cmd/config is an admin command that creates/edits the bridge definition and persists it.
+	/// </summary>
+	private async Task HandleBridgeCommandAsync(string topic, string bridgeId, string commandName, ReadOnlySequence<byte> payload)
+	{
+		var envelope = AudioProcessorJson.Deserialize<MqttCommandEnvelope>(payload);
+
+		if (string.Equals(commandName, "enable", StringComparison.OrdinalIgnoreCase))
+		{
+			var command = AudioProcessorJson.Deserialize<BridgeEnableCommandPayload>(payload);
+			if (command is null)
+			{
+				return;
+			}
+
+			if (!_bridgeEngine.TrySetEnabled(bridgeId, command.Enabled))
+			{
+				await PublishCommandAckAsync(topic, command.MsgId, "rejected", "id", "unknown_bridge", $"No bridge '{bridgeId}'.").ConfigureAwait(false);
+				return;
+			}
+
+			PersistBridges();
+			await PublishBridgeConfigAsync(CancellationToken.None).ConfigureAwait(false);
+			await PublishBridgeStateAsync(CancellationToken.None).ConfigureAwait(false);
+			await PublishCommandAckAsync(topic, command.MsgId, "ok", null, null, null).ConfigureAwait(false);
+			return;
+		}
+
+		if (string.Equals(commandName, "config", StringComparison.OrdinalIgnoreCase))
+		{
+			if (!ValidateAdminCommand(payload, topic))
+			{
+				await PublishCommandAckAsync(topic, envelope?.MsgId, "rejected", "auth", "invalid_auth", "Admin authentication is required.").ConfigureAwait(false);
+				return;
+			}
+
+			var command = AudioProcessorJson.Deserialize<BridgeConfigCommandPayload>(payload);
+			if (command is null)
+			{
+				await PublishCommandAckAsync(topic, envelope?.MsgId, "rejected", "payload", "invalid_payload", "Bridge config payload was unreadable.").ConfigureAwait(false);
+				return;
+			}
+
+			var definition = BuildBridgeFromCommand(bridgeId, command);
+			if (definition is null)
+			{
+				await PublishCommandAckAsync(topic, command.MsgId, "rejected", "members", "invalid_members", "A bridge needs at least two known member radios.").ConfigureAwait(false);
+				return;
+			}
+
+			_bridgeEngine.Upsert(definition);
+			PersistBridges();
+			await PublishBridgeConfigAsync(CancellationToken.None).ConfigureAwait(false);
+			await PublishSpecSystemTopicsAsync(CancellationToken.None).ConfigureAwait(false);
+			await PublishBridgeStateAsync(CancellationToken.None).ConfigureAwait(false);
+			await PublishCommandAckAsync(topic, command.MsgId, "ok", null, null, null).ConfigureAwait(false);
+			return;
+		}
+
+		await PublishCommandAckAsync(topic, envelope?.MsgId, "rejected", "action", "unsupported_action", $"Bridge action '{commandName}' is not supported.").ConfigureAwait(false);
+	}
+
+	private BridgeDefinition? BuildBridgeFromCommand(string bridgeId, BridgeConfigCommandPayload command)
+	{
+		var knownRadioIds = new HashSet<string>(_registry.RadioIds.Select(static radio => radio.Value), StringComparer.OrdinalIgnoreCase);
+		var members = (command.Members ?? Array.Empty<BridgeMemberConfigPayload>())
+			.Where(member => !string.IsNullOrWhiteSpace(member.RadioId) && knownRadioIds.Contains(member.RadioId))
+			.Select(static member => new BridgeMember(new RadioId(member.RadioId), member.Priority, member.TxGainDb))
+			.ToArray();
+
+		if (members.Length < 2)
+		{
+			return null;
+		}
+
+		return new BridgeDefinition(
+			new BridgeId(bridgeId),
+			string.IsNullOrWhiteSpace(command.Alias) ? bridgeId : command.Alias!,
+			new ReadOnlyCollection<BridgeMember>(members),
+			command.HangMs is > 0 ? command.HangMs.Value : 250,
+			command.Enabled ?? true);
+	}
+
+	/// <summary>Persists the current bridge definitions to the System Config Store (§4.2).</summary>
+	private void PersistBridges()
+	{
+		var persisted = _bridgeEngine.Definitions
+			.Select(static bridge => new PersistedBridgeDefinition(
+				bridge.Id.Value,
+				bridge.Alias,
+				bridge.Members.Select(static member => new PersistedBridgeMember(member.RadioId.Value, member.Priority, member.TxGainDb)).ToList(),
+				bridge.HangMs,
+				bridge.Enabled))
+			.ToList();
+
+		_configStore.StoredConfig.BridgesJson = JsonSerializer.Serialize(persisted, PersistedTopologySerializerOptions);
 	}
 
 	private ManualPttRequest? CreateManualPttRequest(string topic, ReadOnlySequence<byte> payload)
@@ -1286,6 +1577,8 @@ internal sealed record RelaySetDefinition(
 			cancellationToken: cancellationToken).ConfigureAwait(false);
 
 		await PublishRadioRuntimeAsync(cancellationToken).ConfigureAwait(false);
+		await PublishBridgeConfigAsync(cancellationToken).ConfigureAwait(false);
+		await PublishBridgeStateAsync(cancellationToken).ConfigureAwait(false);
 
 		await _mqttRuntime.PublishAsync(
 			_topics.RoutingStateTopic,
@@ -1332,7 +1625,7 @@ internal sealed record RelaySetDefinition(
 				ServiceStatusPayload.CreateRunning(
 					serviceId: "audio-processor",
 					radioCount: _registry.RadioIds.Count,
-					bridgeCount: _registry.Bridges.Count,
+					bridgeCount: _bridgeEngine.Definitions.Count,
 					activeManualTransmitRadioId: _txStateMachine.ActiveManualTransmitRadioId?.Value)),
 			retain: true,
 			cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -1348,7 +1641,7 @@ internal sealed record RelaySetDefinition(
 
 		await _mqttRuntime.PublishAsync(
 			_topics.SystemDefinitionTopic,
-			AudioProcessorJson.Serialize(SystemDefinitionPayload.Create(_registry)),
+			AudioProcessorJson.Serialize(SystemDefinitionPayload.Create(_registry, _bridgeEngine.Definitions)),
 			retain: true,
 			cancellationToken: cancellationToken).ConfigureAwait(false);
 	}
@@ -1386,7 +1679,7 @@ internal sealed record RelaySetDefinition(
 
 			await _mqttRuntime.PublishAsync(
 				_topics.ModuleStateTopic(radio.Id),
-				AudioProcessorJson.Serialize(ModuleRadioStateSpecPayload.Create(radio, _txStateMachine.GetState(radio.Id), _callDetectByRadio.TryGetValue(radio.Id.Value, out var radioRxActive) && radioRxActive)),
+				AudioProcessorJson.Serialize(ModuleRadioStateSpecPayload.Create(radio, _txStateMachine.GetState(radio.Id), _callDetectByRadio.TryGetValue(radio.Id.Value, out var radioRxActive) && radioRxActive, _bridgeEngine.IsRadioBridgeKeyed(radio.Id))),
 				retain: true,
 				cancellationToken: cancellationToken).ConfigureAwait(false);
 		}
@@ -1449,7 +1742,8 @@ internal sealed class AudioProcessorRegistry
 		if (topology.RadioDefinitions.Count == 0)
 		{
 			log("config", "No persisted radio definitions found; using built-in starter topology.");
-			return CreateDefault(discoveredModules, log);
+			var defaults = CreateDefault(discoveredModules, log);
+			return new AudioProcessorRegistry(defaults.Radios, BuildBridges(topology.Bridges, defaults.Radios, log));
 		}
 
 		var radios = new List<RadioRuntimeDefinition>();
@@ -1467,7 +1761,56 @@ internal sealed class AudioProcessorRegistry
 			log("config", "Persisted radio definitions did not contain any usable modules; AP will publish an empty declared radio topology.");
 		}
 
-		return new AudioProcessorRegistry(radios.AsReadOnly(), Array.Empty<BridgeDefinition>());
+		return new AudioProcessorRegistry(radios.AsReadOnly(), BuildBridges(topology.Bridges, radios, log));
+	}
+
+	/// <summary>
+	/// Builds validated bridge definitions from persisted config (§3.5). Members that reference an
+	/// unknown radio are dropped; a bridge with fewer than two known members is skipped.
+	/// </summary>
+	private static IReadOnlyList<BridgeDefinition> BuildBridges(
+		IReadOnlyList<AudioProcessorCoordinator.PersistedBridgeDefinition> persisted,
+		IReadOnlyList<RadioRuntimeDefinition> radios,
+		Action<string, string> log)
+	{
+		ArgumentNullException.ThrowIfNull(persisted);
+		ArgumentNullException.ThrowIfNull(radios);
+
+		if (persisted.Count == 0)
+		{
+			return Array.Empty<BridgeDefinition>();
+		}
+
+		var knownRadioIds = new HashSet<string>(radios.Select(static radio => radio.Id.Value), StringComparer.OrdinalIgnoreCase);
+		var bridges = new List<BridgeDefinition>();
+		foreach (var definition in persisted)
+		{
+			if (string.IsNullOrWhiteSpace(definition.BridgeId))
+			{
+				continue;
+			}
+
+			var members = (definition.Members ?? Array.Empty<AudioProcessorCoordinator.PersistedBridgeMember>())
+				.Where(member => !string.IsNullOrWhiteSpace(member.RadioId) && knownRadioIds.Contains(member.RadioId))
+				.Select(static member => new BridgeMember(new RadioId(member.RadioId), member.Priority, member.TxGainDb))
+				.ToArray();
+
+			if (members.Length < 2)
+			{
+				log("config", $"Bridge '{definition.BridgeId}' skipped: fewer than two known member radios.");
+				continue;
+			}
+
+			bridges.Add(new BridgeDefinition(
+				new BridgeId(definition.BridgeId),
+				string.IsNullOrWhiteSpace(definition.Alias) ? definition.BridgeId : definition.Alias,
+				new ReadOnlyCollection<BridgeMember>(members),
+				definition.HangMs > 0 ? definition.HangMs : 250,
+				definition.Enabled));
+		}
+
+		log("config", $"Loaded {bridges.Count} bridge definition(s).");
+		return bridges;
 	}
 
 	public static AudioProcessorRegistry CreateDefault(IReadOnlyList<AudioProcessorCoordinator.DiscoveredRadioModule> discoveredModules, Action<string, string> log)
@@ -1767,11 +2110,43 @@ internal sealed class AudioProcessorTopicFactory
 
 	private const string ModuleRootTopic = "myforce/module";
 
+	private const string BridgeRootTopic = "myforce/bridge";
+
 	public string AllCommandsTopicFilter => $"{RootTopic}/cmd/#";
 
 	public string AllModuleCommandsTopicFilter => $"{ModuleRootTopic}/+/cmd/#";
 
+	public string AllBridgeCommandsTopicFilter => $"{BridgeRootTopic}/+/cmd/#";
+
 	public string ConsolePttCommandTopicFilter => $"{ConsoleRootTopic}/+/cmd/ptt";
+
+	public string BridgeConfigTopic(string bridgeId) => $"{BridgeRootTopic}/{bridgeId}/config";
+
+	public string BridgeStateTopic(string bridgeId) => $"{BridgeRootTopic}/{bridgeId}/state";
+
+	public static bool TryParseBridgeCommandTopic(string topic, out string bridgeId, out string commandName)
+	{
+		bridgeId = string.Empty;
+		commandName = string.Empty;
+
+		if (string.IsNullOrWhiteSpace(topic))
+		{
+			return false;
+		}
+
+		var parts = topic.Split('/', StringSplitOptions.RemoveEmptyEntries);
+		if (parts.Length != 5
+			|| !string.Equals(parts[0], "myforce", StringComparison.OrdinalIgnoreCase)
+			|| !string.Equals(parts[1], "bridge", StringComparison.OrdinalIgnoreCase)
+			|| !string.Equals(parts[3], "cmd", StringComparison.OrdinalIgnoreCase))
+		{
+			return false;
+		}
+
+		bridgeId = parts[2];
+		commandName = parts[4];
+		return true;
+	}
 
 	public string SystemPluginsTopic => $"{SystemRootTopic}/plugins";
 
@@ -1915,7 +2290,6 @@ internal sealed record AudioChannelId(string Value)
 	public override string ToString() => Value;
 }
 
-internal sealed record BridgeDefinition(BridgeId Id, ReadOnlyCollection<RadioId> Members);
 
 internal sealed record AudioDevice(AudioDeviceId Id, string DisplayName, string Role, bool InputEnabled, bool OutputEnabled);
 
@@ -2606,9 +2980,10 @@ internal sealed record SystemDefinitionPayload(
 	IReadOnlyList<SystemDefinitionBridgePayload> Bridges,
 	IReadOnlyList<SystemDefinitionConsolePayload> Consoles)
 {
-	public static SystemDefinitionPayload Create(AudioProcessorRegistry registry)
+	public static SystemDefinitionPayload Create(AudioProcessorRegistry registry, IReadOnlyList<BridgeDefinition> bridges)
 	{
 		ArgumentNullException.ThrowIfNull(registry);
+		ArgumentNullException.ThrowIfNull(bridges);
 
 		return new SystemDefinitionPayload(
 			1,
@@ -2619,7 +2994,7 @@ internal sealed record SystemDefinitionPayload(
 				Alias: radio.DisplayName,
 				Category: "radio",
 				Required: radio.Kind == RadioRuntimeKind.Resource)).ToArray(),
-			registry.Bridges.Select(static bridge => new SystemDefinitionBridgePayload(bridge.Id.Value, bridge.Id.Value)).ToArray(),
+			bridges.Select(static bridge => new SystemDefinitionBridgePayload(bridge.Id.Value, bridge.Alias)).ToArray(),
 			[new SystemDefinitionConsolePayload("vip", "Vehicle Interface")]);
 	}
 }
@@ -2634,6 +3009,80 @@ internal sealed record SystemDefinitionModulePayload(
 internal sealed record SystemDefinitionBridgePayload(string Id, string Alias);
 
 internal sealed record SystemDefinitionConsolePayload(string Id, string Alias);
+
+// ---- Bridge payloads (§5.8.7) ----
+
+internal sealed record BridgeConfigPayload(
+	int V,
+	DateTimeOffset Ts,
+	string Id,
+	string Alias,
+	IReadOnlyList<BridgeMemberConfigPayload> Members,
+	[property: JsonPropertyName("hang_ms")] int HangMs,
+	bool Enabled)
+{
+	public static BridgeConfigPayload Create(BridgeDefinition bridge)
+	{
+		ArgumentNullException.ThrowIfNull(bridge);
+		return new BridgeConfigPayload(
+			1,
+			DateTimeOffset.UtcNow,
+			bridge.Id.Value,
+			bridge.Alias,
+			bridge.Members.Select(static member => new BridgeMemberConfigPayload(member.RadioId.Value, member.Priority, member.TxGainDb)).ToArray(),
+			bridge.HangMs,
+			bridge.Enabled);
+	}
+}
+
+internal sealed record BridgeMemberConfigPayload(
+	[property: JsonPropertyName("radio_id")] string RadioId,
+	int Priority,
+	[property: JsonPropertyName("tx_gain_db")] double TxGainDb);
+
+internal sealed record BridgeStatePayload(
+	int V,
+	DateTimeOffset Ts,
+	string Id,
+	bool Active,
+	string? Holder,
+	IReadOnlyList<BridgeMemberStatePayload> Members)
+{
+	public static BridgeStatePayload Create(BridgeStateSnapshot state)
+	{
+		ArgumentNullException.ThrowIfNull(state);
+		return new BridgeStatePayload(
+			1,
+			DateTimeOffset.UtcNow,
+			state.Id,
+			state.Active,
+			state.Holder,
+			state.Members.Select(static member => new BridgeMemberStatePayload(member.RadioId, member.RxActive, member.TxActive)).ToArray());
+	}
+}
+
+internal sealed record BridgeMemberStatePayload(
+	[property: JsonPropertyName("radio_id")] string RadioId,
+	[property: JsonPropertyName("rx_active")] bool RxActive,
+	[property: JsonPropertyName("tx_active")] bool TxActive);
+
+internal sealed record BridgeConfigCommandPayload(
+	int V,
+	DateTimeOffset Ts,
+	[property: JsonPropertyName("msg_id")] string? MsgId,
+	string? Auth,
+	string? Id,
+	string? Alias,
+	IReadOnlyList<BridgeMemberConfigPayload>? Members,
+	[property: JsonPropertyName("hang_ms")] int? HangMs,
+	bool? Enabled);
+
+internal sealed record BridgeEnableCommandPayload(
+	int V,
+	DateTimeOffset Ts,
+	[property: JsonPropertyName("msg_id")] string? MsgId,
+	string? Auth,
+	bool Enabled);
 
 internal sealed record ModuleRegistrySpecPayload(
 	int V,
@@ -3011,6 +3460,10 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
 
 	private decimal _outputGain = 1.0m;
 
+	// Ducking multiplier (0..1): the AP attenuates the entertainment source while a comms radio is
+	// active so traffic is never buried under entertainment audio (§3.5). 1.0 = no ducking.
+	private decimal _duckFactor = 1.0m;
+
 	private int _unexpectedLinuxRestartAttempts;
 
 	private DateTimeOffset? _linuxPlaybackStartedAtUtc;
@@ -3270,11 +3723,30 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
 		ApplyCurrentOutputGain();
 	}
 
+	/// <summary>
+	/// Sets the ducking multiplier applied on top of the operator volume (§3.5). The control thread
+	/// drives this from radio RX/TX activity; 1.0 restores full entertainment level.
+	/// </summary>
+	public void SetDuckLevel(decimal duckFactor)
+	{
+		var clamped = decimal.Clamp(duckFactor, 0m, 1m);
+		if (clamped == _duckFactor)
+		{
+			return;
+		}
+
+		_duckFactor = clamped;
+		ApplyCurrentOutputGain();
+	}
+
+	/// <summary>The operator volume after the current ducking multiplier (§3.5).</summary>
+	private decimal EffectiveGain => decimal.Clamp(_outputGain * _duckFactor, 0m, 2m);
+
 	private void ApplyCurrentOutputGain()
 	{
 		if (_waveOut is not null)
 		{
-			_waveOut.Volume = (float)Math.Clamp(_outputGain / 2.0m, 0m, 1.0m);
+			_waveOut.Volume = (float)Math.Clamp(EffectiveGain / 2.0m, 0m, 1.0m);
 			return;
 		}
 
@@ -3310,7 +3782,7 @@ internal sealed class InternetRadioPlaybackController : IAsyncDisposable
 		}
 
 		// _outputGain is 0..2 (unity = 1.0). Map to a percent and cap to keep headroom below clipping.
-		var percent = Math.Clamp((int)Math.Round((double)_outputGain * 100.0), 0, 150);
+		var percent = Math.Clamp((int)Math.Round((double)EffectiveGain * 100.0), 0, 150);
 		var result = RunProcessCapture("pactl", $"set-sink-input-volume {sinkInputIndex.Value} {percent.ToString(CultureInfo.InvariantCulture)}%");
 		if (result is null)
 		{

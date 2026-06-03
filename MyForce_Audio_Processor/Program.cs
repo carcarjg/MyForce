@@ -591,5 +591,7 @@ public interface IAudioProcessorStoredConfig
 
 	string? RelaySetsJson { get; set; }
 
+	string? BridgesJson { get; set; }
+
 	string? PluginDirectoryPath { get; set; }
 }
