@@ -65,7 +65,30 @@ internal static class InternetRadioMqttTopics
 	public const string SystemDefinitionTopic = "myforce/sys/definition";
 	public const string ModuleTopicFilter = "myforce/module/+/+";
 	public const string ConsoleTxTopic = "myforce/console/tx";
+
+	// Physical hand grip controller (HCD): it publishes the selected mode and soft-key presses; the UI
+	// subscribes to drive the Hand Grip Mode display and trigger the on-screen soft keys.
+	public const string HcdModeTopicFilter = "myforce/console/+/hcd/mode";
+	public const string HcdSoftKeyTopicFilter = "myforce/console/+/hcd/softkey";
+
+	// The UI republishes a soft-key activation (from touch or the HCD) so downstream mappings can react.
+	public const string SoftKeyCommandTopic = "myforce/console/vip/cmd/softkey";
 }
+
+/// <summary>HCD-published hand grip mode (lights / radio / patrol).</summary>
+internal sealed record HcdModeMessage(string? Mode);
+
+/// <summary>HCD-published soft-key press (1-6).</summary>
+internal sealed record HcdSoftKeyMessage(int Index);
+
+/// <summary>UI-published soft-key activation, with the active hand grip mode for context.</summary>
+internal sealed record SoftKeyCommandMessage(
+	int V,
+	DateTimeOffset Ts,
+	string? MsgId,
+	string? Auth,
+	int Index,
+	string Mode);
 
 /// <summary>
 /// Represents a UI request for the AP to start internet radio playback.

@@ -813,71 +813,125 @@
                                     </Border>
                                 </Grid>
 
-                                <!-- Voice Memo -->
-                                <Border Grid.Column="1" Classes="panel" Width="183" Height="179" Padding="8" VerticalAlignment="Top">
-                                    <Grid Width="165" Height="161" RowDefinitions="28,133">
-                                        <TextBlock Classes="white"
-                                                   Width="165"
-                                                   Height="28"
-                                                   FontSize="18"
-                                                   TextAlignment="Center"
-                                                   Text="MEMO" />
-                                        <Border Grid.Row="1" Classes="buttonFrame" Width="165" Height="133" PointerPressed="OnMemoRecordPressed">
-                                            <Grid>
-                                                <Viewbox Stretch="Uniform"
-                                                         HorizontalAlignment="Center"
-                                                         VerticalAlignment="Center"
-                                                         MaxWidth="120"
-                                                         MaxHeight="90">
-                                                    <TextBlock Classes="white"
-                                                               TextAlignment="Center"
-                                                               VerticalAlignment="Center"
-                                                               Text="REC" />
-                                                </Viewbox>
-                                            </Grid>
-                                        </Border>
-                                    </Grid>
-                                </Border>
+                                <!-- Voice Memo (soft key 3) with hidden custom soft key 5 below -->
+                                <Grid Grid.Column="1" Width="183" Height="369" RowDefinitions="179,182" RowSpacing="8" VerticalAlignment="Top">
+                                    <Border Classes="panel" Width="183" Height="179" Padding="8">
+                                        <Grid Width="165" Height="161" RowDefinitions="28,133">
+                                            <TextBlock Classes="white"
+                                                       Width="165"
+                                                       Height="28"
+                                                       FontSize="18"
+                                                       TextAlignment="Center"
+                                                       Text="MEMO" />
+                                            <Border Grid.Row="1" Classes="buttonFrame" Width="165" Height="133" PointerPressed="OnMemoRecordPressed">
+                                                <Grid>
+                                                    <Viewbox Stretch="Uniform"
+                                                             HorizontalAlignment="Center"
+                                                             VerticalAlignment="Center"
+                                                             MaxWidth="120"
+                                                             MaxHeight="90">
+                                                        <TextBlock Classes="white"
+                                                                   TextAlignment="Center"
+                                                                   VerticalAlignment="Center"
+                                                                   Text="REC" />
+                                                    </Viewbox>
+                                                </Grid>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                    <!-- Hidden custom soft key 5 -->
+                                    <Border Grid.Row="1" Classes="panel" Width="183" Height="182" Padding="8" IsVisible="{Binding IsSoftKey5Visible}">
+                                        <Grid Width="165" Height="164" RowDefinitions="28,136">
+                                            <TextBlock Classes="white"
+                                                       Width="165"
+                                                       Height="28"
+                                                       FontSize="18"
+                                                       TextAlignment="Center"
+                                                       Text="SOFT 5" />
+                                            <Border Grid.Row="1" Classes="buttonFrame" Width="165" Height="136" PointerPressed="OnSoftKey5Pressed">
+                                                <Grid>
+                                                    <Viewbox Stretch="Uniform"
+                                                             HorizontalAlignment="Center"
+                                                             VerticalAlignment="Center"
+                                                             MaxWidth="120"
+                                                             MaxHeight="90">
+                                                        <TextBlock Classes="white"
+                                                                   TextAlignment="Center"
+                                                                   VerticalAlignment="Center"
+                                                                   Text="--" />
+                                                    </Viewbox>
+                                                </Grid>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
 
-                                <!-- Vehicle Radio Mute -->
-                                <Border Grid.Column="2" Classes="panel" Width="186" Height="176" Padding="8" VerticalAlignment="Top">
-                                    <Grid Width="168" Height="158" RowDefinitions="28,130">
-                                        <TextBlock Classes="white"
-                                                   Width="168"
-                                                   Height="28"
-                                                   FontSize="18"
-                                                   TextAlignment="Center"
-                                                   Text="AM / FM" />
-                                        <Border Grid.Row="1" Classes="buttonFrame" Width="168" Height="130" PointerPressed="OnAmFmMutePressed" IsVisible="{Binding !IsAmFmMuted}">
-                                            <Grid>
-                                                <Viewbox Stretch="Uniform"
-                                                         HorizontalAlignment="Center"
-                                                         VerticalAlignment="Center"
-                                                         MaxWidth="128"
-                                                         MaxHeight="92">
-                                                    <TextBlock Classes="white"
-                                                               TextAlignment="Center"
-                                                               VerticalAlignment="Center"
-                                                               Text="MUTE" />
-                                                </Viewbox>
-                                            </Grid>
-                                        </Border>
-                                        <Border Grid.Row="1" Classes="buttonFrame active" Width="168" Height="130" PointerPressed="OnAmFmMutePressed" IsVisible="{Binding IsAmFmMuted}">
-                                            <Grid>
-                                                <Viewbox Stretch="Uniform"
-                                                         HorizontalAlignment="Center"
-                                                         VerticalAlignment="Center"
-                                                         MaxWidth="128"
-                                                         MaxHeight="92">
-                                                    <TextBlock Classes="white"
-                                                               TextAlignment="Center"
-                                                               VerticalAlignment="Center"
-                                                               Text="MUTE" />
-                                                </Viewbox>
-                                            </Grid>
-                                        </Border>
-                                    </Grid>
-                                </Border>
+                                <!-- AM/FM Mute (soft key 4) with hidden custom soft key 6 below -->
+                                <Grid Grid.Column="2" Width="186" Height="369" RowDefinitions="176,185" RowSpacing="8" VerticalAlignment="Top">
+                                    <Border Classes="panel" Width="186" Height="176" Padding="8">
+                                        <Grid Width="168" Height="158" RowDefinitions="28,130">
+                                            <TextBlock Classes="white"
+                                                       Width="168"
+                                                       Height="28"
+                                                       FontSize="18"
+                                                       TextAlignment="Center"
+                                                       Text="AM / FM" />
+                                            <Border Grid.Row="1" Classes="buttonFrame" Width="168" Height="130" PointerPressed="OnAmFmMutePressed" IsVisible="{Binding !IsAmFmMuted}">
+                                                <Grid>
+                                                    <Viewbox Stretch="Uniform"
+                                                             HorizontalAlignment="Center"
+                                                             VerticalAlignment="Center"
+                                                             MaxWidth="128"
+                                                             MaxHeight="92">
+                                                        <TextBlock Classes="white"
+                                                                   TextAlignment="Center"
+                                                                   VerticalAlignment="Center"
+                                                                   Text="MUTE" />
+                                                    </Viewbox>
+                                                </Grid>
+                                            </Border>
+                                            <Border Grid.Row="1" Classes="buttonFrame active" Width="168" Height="130" PointerPressed="OnAmFmMutePressed" IsVisible="{Binding IsAmFmMuted}">
+                                                <Grid>
+                                                    <Viewbox Stretch="Uniform"
+                                                             HorizontalAlignment="Center"
+                                                             VerticalAlignment="Center"
+                                                             MaxWidth="128"
+                                                             MaxHeight="92">
+                                                        <TextBlock Classes="white"
+                                                                   TextAlignment="Center"
+                                                                   VerticalAlignment="Center"
+                                                                   Text="MUTE" />
+                                                    </Viewbox>
+                                                </Grid>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                    <!-- Hidden custom soft key 6 -->
+                                    <Border Grid.Row="1" Classes="panel" Width="186" Height="185" Padding="8" IsVisible="{Binding IsSoftKey6Visible}">
+                                        <Grid Width="168" Height="167" RowDefinitions="28,139">
+                                            <TextBlock Classes="white"
+                                                       Width="168"
+                                                       Height="28"
+                                                       FontSize="18"
+                                                       TextAlignment="Center"
+                                                       Text="SOFT 6" />
+                                            <Border Grid.Row="1" Classes="buttonFrame" Width="168" Height="139" PointerPressed="OnSoftKey6Pressed">
+                                                <Grid>
+                                                    <Viewbox Stretch="Uniform"
+                                                             HorizontalAlignment="Center"
+                                                             VerticalAlignment="Center"
+                                                             MaxWidth="128"
+                                                             MaxHeight="92">
+                                                        <TextBlock Classes="white"
+                                                                   TextAlignment="Center"
+                                                                   VerticalAlignment="Center"
+                                                                   Text="--" />
+                                                    </Viewbox>
+                                                </Grid>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
                             </Grid>
                         </Grid>
                         </Grid>

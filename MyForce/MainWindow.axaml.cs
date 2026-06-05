@@ -430,18 +430,25 @@ public partial class MainWindow : Window
 		_viewModel.ToggleDirectional(DirectionalMode.Right);
 	}
 
+	// Soft keys 1-6 under the directionals: route touch presses through the same trigger the HCD uses.
 	private void OnLightsAndSirensOffPressed(object? sender, PointerPressedEventArgs e)
-	{ }
+		=> _viewModel.TriggerSoftKey(1);
 
 	private void OnExternalAudioPressed(object? sender, PointerPressedEventArgs e)
-	{ }
+		=> _viewModel.TriggerSoftKey(2);
 
 	private void OnMemoRecordPressed(object? sender, PointerPressedEventArgs e)
-	{ }
+		=> _viewModel.TriggerSoftKey(3);
+
+	private void OnSoftKey5Pressed(object? sender, PointerPressedEventArgs e)
+		=> _viewModel.TriggerSoftKey(5);
+
+	private void OnSoftKey6Pressed(object? sender, PointerPressedEventArgs e)
+		=> _viewModel.TriggerSoftKey(6);
 
 	private void OnAmFmMutePressed(object? sender, PointerPressedEventArgs e)
 	{
-		_viewModel.ToggleAmFmMute();
+		_viewModel.TriggerSoftKey(4);
 	}
 
 	private void OnFm1SourcePressed(object? sender, PointerPressedEventArgs e)

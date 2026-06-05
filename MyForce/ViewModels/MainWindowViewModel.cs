@@ -540,6 +540,72 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 
 	public string SoftKeysDisplay => $"Soft Keys: {_handGripMode}";
 
+	// Soft keys 1-6 under the directionals. 1-4 are visible (L/S, EXT AUDIO, MEMO, AM/FM); 5-6 are
+	// hidden placeholders (under MEMO and AM/FM) for custom soft keys revealed per hand grip mode.
+	public const int SoftKeyCount = 6;
+
+	private bool _isSoftKey5Visible;
+
+	private bool _isSoftKey6Visible;
+
+	public bool IsSoftKey5Visible
+	{
+		get => _isSoftKey5Visible;
+		set => SetProperty(ref _isSoftKey5Visible, value);
+	}
+
+	public bool IsSoftKey6Visible
+	{
+		get => _isSoftKey6Visible;
+		set => SetProperty(ref _isSoftKey6Visible, value);
+	}
+
+	/// <summary>
+	/// Activates a soft key (1-6) from the touchscreen or the physical hand grip controller. Performs the
+	/// key's built-in local action and republishes the activation so downstream mappings can react.
+	/// </summary>
+	public void TriggerSoftKey(int index)
+	{
+		if (index < 1 || index > SoftKeyCount)
+		{
+			return;
+		}
+
+		// Built-in local actions for keys that already drive UI behaviour today.
+		switch (index)
+		{
+			case 4:
+				ToggleAmFmMute();
+				break;
+			default:
+				break;
+		}
+
+		PublishSoftKeyCommand(index);
+	}
+
+	/// <summary>Applies an HCD-published hand grip mode (lights / radio / patrol).</summary>
+	public void ApplyHandGripMode(string? mode)
+	{
+		if (Enum.TryParse<HandGripMode>(mode, ignoreCase: true, out var parsed))
+		{
+			HandGripMode = parsed;
+		}
+	}
+
+	private void PublishSoftKeyCommand(int index)
+	{
+		var envelope = CreateCommandEnvelope(isAdminCommand: false, includeMessageId: true);
+		var command = new SoftKeyCommandMessage(
+			envelope.V,
+			envelope.Ts,
+			envelope.MsgId,
+			envelope.Auth,
+			index,
+			_handGripMode.ToString());
+		_ = PublishCommandAsync(InternetRadioMqttTopics.SoftKeyCommandTopic, command);
+	}
+
 	public string MqttStatus
 	{
 		get => _mqttStatus;
@@ -1707,6 +1773,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.SystemDefinitionTopic).ConfigureAwait(false);
 		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.ModuleTopicFilter).ConfigureAwait(false);
 		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.ConsoleTxTopic).ConfigureAwait(false);
+		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.HcdModeTopicFilter).ConfigureAwait(false);
+		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.HcdSoftKeyTopicFilter).ConfigureAwait(false);
 		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.AudioProcessorRegistryTopic).ConfigureAwait(false);
 		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.StateTopic).ConfigureAwait(false);
 		await _mqttConnectionService.SubscribeAsync(InternetRadioMqttTopics.AudioFrameworkStateTopic).ConfigureAwait(false);
@@ -1733,6 +1801,37 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IDisposable
 	{
 		if (HandleSpecMqttMessage(message))
 		{
+			return;
+		}
+
+		// Hand grip controller (HCD): mode selection and soft-key presses (topics are console-scoped).
+		if (message.Topic.EndsWith("/hcd/mode", StringComparison.OrdinalIgnoreCase))
+		{
+			var payload = message.ConvertPayloadToString();
+			if (!string.IsNullOrWhiteSpace(payload))
+			{
+				var mode = JsonSerializer.Deserialize<HcdModeMessage>(payload, MqttJsonSerializerOptions);
+				if (mode is not null)
+				{
+					Dispatcher.UIThread.Post(() => ApplyHandGripMode(mode.Mode));
+				}
+			}
+
+			return;
+		}
+
+		if (message.Topic.EndsWith("/hcd/softkey", StringComparison.OrdinalIgnoreCase))
+		{
+			var payload = message.ConvertPayloadToString();
+			if (!string.IsNullOrWhiteSpace(payload))
+			{
+				var softKey = JsonSerializer.Deserialize<HcdSoftKeyMessage>(payload, MqttJsonSerializerOptions);
+				if (softKey is not null)
+				{
+					Dispatcher.UIThread.Post(() => TriggerSoftKey(softKey.Index));
+				}
+			}
+
 			return;
 		}
 
