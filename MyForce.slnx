@@ -1,13 +1,26 @@
 <Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="ARM" />
+    <Platform Name="ARM64" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
   <Project Path="MyForce.Contracts.Radio/MyForce.Contracts.Radio.csproj" />
   <Project Path="MyForce/MyForce_UI.csproj" />
   <Project Path="MyForce_Audio_Processor/MyForce_Audio_Processor.csproj" Id="b3fe1804-14a7-4e1d-b02c-08e82614d16a" />
   <Project Path="MyForce_CarInterface/MyForce_CarInterface.csproj" Id="5dfd1248-0595-4c32-b6e8-65606c39d91f" />
-  <Project Path="MyForce_GPIO_Controller/MyForce_GPIO_Controller.csproj" Id="03216f1a-d071-43fb-8ac4-93d8353e8ff3" />
-  <Project Path="MyForce_Siren_Interface/MyForce_Siren_Interface.csproj" Id="ed373d49-ebd3-4a79-9354-1ada75e8f372" />
+  <Project Path="MyForce_GPIO_Controller/MyForce_GPIO_Controller.vcxproj" Id="47a9d19a-7a9a-42b8-a727-eb3649e061c4">
+    <Platform Solution="*|ARM" Project="x64" />
+    <Platform Solution="*|ARM64" Project="x64" />
+  </Project>
   <Project Path="MyForce_RadioModule_Barrett/MyForce_RadioModule_Barrett.csproj" />
-  <Project Path="MyForce_RadioModule_MotorolaXpr/MyForce_RadioModule_MotorolaXpr.csproj" />
-  <Project Path="MyForce_RadioModule_MotorolaMtm5400/MyForce_RadioModule_MotorolaMtm5400.csproj" />
-  <Project Path="MyForce_RadioModule_MotorolaApxXtl/MyForce_RadioModule_MotorolaApxXtl.csproj" />
   <Project Path="MyForce_RadioModule_Harris/MyForce_RadioModule_Harris.csproj" />
+  <Project Path="MyForce_RadioModule_MotorolaApxXtl/MyForce_RadioModule_MotorolaApxXtl.csproj" />
+  <Project Path="MyForce_RadioModule_MotorolaMtm5400/MyForce_RadioModule_MotorolaMtm5400.csproj" />
+  <Project Path="MyForce_RadioModule_MotorolaXpr/MyForce_RadioModule_MotorolaXpr.csproj" />
+  <Project Path="MyForce_Siren_Controller/MyForce_Siren_Controller.vcxproj" Id="8eb8bd19-faed-4f5d-bcbc-73a710ea6435">
+    <Platform Solution="*|ARM" Project="x64" />
+    <Platform Solution="*|ARM64" Project="x64" />
+  </Project>
 </Solution>

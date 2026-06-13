@@ -23,7 +23,39 @@ internal enum RelayBoardProtocol
 	NumericByte,
 
 	/// <summary>Active-low ASCII: assert closes the line, so the on/off words are swapped.</summary>
-	ActiveLowAscii
+	ActiveLowAscii,
+
+	/// <summary>
+	/// Eight-byte checksum-framed RS232 relay board (R.C. Willett dialect): a fixed
+	/// {0x55, 0x56, 0x00, 0x00, 0x00} function id, then the relay id (1-based, = our channel),
+	/// then the command (<see cref="Rs232RelayCommand"/>), then a checksum = low byte of the sum
+	/// of bytes 1-7. 9600 baud, 8N1 (§3.6.3).
+	/// </summary>
+	Rs232RelayBoard
+}
+
+/// <summary>
+/// Command byte for the <see cref="RelayBoardProtocol.Rs232RelayBoard"/> 8-byte frame (byte 7).
+/// Named values keep the wire codes out of the protocol logic (no magic numbers). The AP keying
+/// primitive only asserts/deasserts, so it uses <see cref="On"/> / <see cref="Off"/>; the other
+/// commands are documented here to match the board spec.
+/// </summary>
+internal enum Rs232RelayCommand : byte
+{
+	/// <summary>Turn the relay on.</summary>
+	On = 0x01,
+
+	/// <summary>Turn the relay off.</summary>
+	Off = 0x02,
+
+	/// <summary>Toggle the relay's current state.</summary>
+	Toggle = 0x03,
+
+	/// <summary>Jog: turn on, then off after 250ms.</summary>
+	Jog = 0x04,
+
+	/// <summary>Interlock: turn on the specified relay and turn off all others.</summary>
+	Interlock = 0x05
 }
 
 /// <summary>
@@ -190,6 +222,20 @@ internal sealed class RelayKeyingService : IDisposable
 				case RelayBoardProtocol.ActiveLowAscii:
 					port.WriteLine(asserted ? $"OFF{channel}" : $"ON{channel}");
 					break;
+				case RelayBoardProtocol.Rs232RelayBoard:
+					// 8-byte frame (§3.6.3): {0x55, 0x56, 0x00, 0x00, 0x00, relayId, command, checksum}.
+					// Relay id is 1-based and maps directly to our channel; the keying primitive only
+					// asserts/deasserts so we send On/Off. Checksum is the low byte of the sum of bytes 1-7.
+					byte[] frame = { 0x55, 0x56, 0x00, 0x00, 0x00, (byte)channel, (byte)(asserted ? Rs232RelayCommand.On : Rs232RelayCommand.Off), 0x00 };
+					byte checksum = 0;
+					for (int i = 0; i < frame.Length - 1; i++)
+					{
+						checksum += frame[i]; // byte addition wraps to the low byte, which is exactly the spec's checksum.
+					}
+
+					frame[^1] = checksum;
+					port.Write(frame, 0, frame.Length);
+					break;
 				case RelayBoardProtocol.Ascii:
 				default:
 					port.WriteLine(asserted ? $"ON{channel}" : $"OFF{channel}");
@@ -203,6 +249,7 @@ internal sealed class RelayKeyingService : IDisposable
 			{
 				"numericbyte" or "numeric" or "byte" => RelayBoardProtocol.NumericByte,
 				"activelowascii" or "activelow" => RelayBoardProtocol.ActiveLowAscii,
+				"rs232relayboard" or "rs232relay" or "rs232" or "willett" => RelayBoardProtocol.Rs232RelayBoard,
 				_ => RelayBoardProtocol.Ascii
 			};
 		}
